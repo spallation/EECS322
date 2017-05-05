@@ -2,7 +2,10 @@
 
 #include <vector>
 #include <sstream>
-// #include <iostream>
+#include <string>
+#include <iostream>
+
+using namespace std;
 
 namespace L3 {
 
@@ -27,11 +30,48 @@ namespace L3 {
     //     ARRAYERROR
     // };
 
+    class Node {
+        public:
+            std::string item;
+            std::vector< Node * > children;
+
+            Node ();
+            Node (std::string it) {
+                item = it;
+            }
+            // Node(std::string it, std::vector<std::string> vec) {
+            //     item = it;
+            //     for (auto v : vec) {
+            //         Node * ch = new Node(v);
+            //         children.push_back(ch);
+            //     }
+            // }
+    };
+
+
+    class Tree {
+        public:
+            Node * root;
+    };
+
     class Instruction {
         public:
             L3::Instruction_Type instr_type;
+            Tree *t;
 
             virtual std::string toString() const { return ""; };
+            virtual void genTree() { return; };
+
+            void printTree() {
+                printNode(t->root);
+                cout << endl;
+            }
+            void printNode(Node *n) {
+                cout << n->item << " ";
+                for (auto ch : n->children) {
+                    printNode(ch);
+                }
+            }
     };
 
     class Simple_Assign_Instruction : public Instruction {
@@ -43,6 +83,13 @@ namespace L3 {
                 std::string s("");
                 s += assign_left + " <- " + assign_right;
                 return s;
+            }
+
+            void genTree() {
+                t = new Tree();
+                t->root = new Node("<-");
+                t->root->children.push_back(new Node(assign_left));
+                t->root->children.push_back(new Node(assign_right));
             }
     };
 
@@ -58,6 +105,18 @@ namespace L3 {
                 s += assign_left + " <- " + op_left + " " + op + " " + op_right;
                 return s;
             }
+
+            void genTree() {
+                t = new Tree();
+                t->root = new Node("<-");
+                
+                Node *assign_right = new Node(op);
+                assign_right->children.push_back(new Node(op_left));
+                assign_right->children.push_back(new Node(op_right));
+                
+                t->root->children.push_back(new Node(assign_left));
+                t->root->children.push_back(assign_right);
+            }
     };
 
     class Cmp_Assign_Instruction : public Instruction {
@@ -72,6 +131,18 @@ namespace L3 {
                 s += assign_left + " <- " + cmp_left + " " + cmp + " " + cmp_right;
                 return s;
             }
+
+            void genTree() {
+                t = new Tree();
+                t->root = new Node("<-");
+
+                Node *assign_right = new Node(cmp);
+                assign_right->children.push_back(new Node(cmp_left));
+                assign_right->children.push_back(new Node(cmp_right));
+
+                t->root->children.push_back(new Node(assign_left));
+                t->root->children.push_back(assign_right);
+            }
     };
 
     class Load_Assign_Instruction : public Instruction {
@@ -84,6 +155,17 @@ namespace L3 {
                 s += assign_left + " <- load " + var;
                 return s;
             }
+
+            void genTree() {
+                t = new Tree();
+                t->root = new Node("<-");
+
+                Node *assign_right = new Node("load");
+                assign_right->children.push_back(new Node(var));
+                
+                t->root->children.push_back(new Node(assign_left));
+                t->root->children.push_back(assign_right);
+            }
     };
 
     class Store_Assign_Instruction : public Instruction {
@@ -95,6 +177,17 @@ namespace L3 {
                 std::string s("");
                 s += "store " + var + " <- " + assign_right;
             return s;
+            }
+
+            void genTree() {
+                t = new Tree();
+                t->root = new Node("<-");
+
+                Node *assign_left = new Node("store");
+                assign_left->children.push_back(new Node(var));
+
+                t->root->children.push_back(assign_left);
+                t->root->children.push_back(new Node(assign_right));
             }
     };
 
@@ -119,15 +212,36 @@ namespace L3 {
                 s += assign_left + " <- call " + callee + " (" + oss.str() + ")";
                 return s;
             }
+
+            void genTree() {
+                t = new Tree();
+                t->root = new Node("<-");
+
+                Node *assign_right = new Node("call");
+                assign_right->children.push_back(new Node(callee));
+                for (auto arg : args) {
+                    assign_right->children.push_back(new Node(arg));
+                }
+
+                t->root->children.push_back(new Node(assign_left));
+                t->root->children.push_back(assign_right);
+            }
     };
 
     class Br1_Instruction : public Instruction {
         public:
             std::string label;
+            
             std::string toString() const {
                 std::string s("");
                 s += "br " + label;
                 return s;
+            }
+
+            void genTree() {
+                t = new Tree();
+                t->root = new Node("br");
+                t->root->children.push_back(new Node(label));
             }
     };
 
@@ -136,10 +250,19 @@ namespace L3 {
             std::string var;
             std::string label1;
             std::string label2;
+            
             std::string toString() const {
                 std::string s("");
                 s += "br " + var + " " + label1 + " " + label2;
                 return s;
+            }
+
+            void genTree() {
+                t = new Tree();
+                t->root = new Node("br");
+                t->root->children.push_back(new Node(var));
+                t->root->children.push_back(new Node(label1));
+                t->root->children.push_back(new Node(label2));
             }
     };
 
@@ -148,15 +271,27 @@ namespace L3 {
             std::string toString() const {
                 return "return";
             }
+
+            void genTree() {
+                t = new Tree();
+                t->root = new Node("return");
+            }
     };
 
     class Var_Return_Instruction : public Return_Instruction {
         public:
             std::string var;
+            
             std::string toString() const {
                 std::string s("");
                 s += "return " + var;
                 return s;
+            }
+
+            void genTree() {
+                t = new Tree();
+                t->root = new Node("return");
+                t->root->children.push_back(new Node(var));
             }
     };
 
@@ -178,20 +313,17 @@ namespace L3 {
 
                 std::string s("");
                 s = s + "call " + callee + " (" + oss.str() + ")";
-                // switch(callee) {
-                //     case L3::PRINT :
-                //         s = s + "call print " + " (" + oss.str() + ")";
-                //         break;
-                //     case L3::ALLOCATE :
-                //         s = s + "call allocate " + " (" + oss.str() + ")";
-                //         break;
-                //     case L3::ARRAYERROR :
-                //         s = s + "call array-error " + " (" + oss.str() + ")";
-                //         break;
-                //     default :
-                //         break;
-                // }
+                
                 return s;
+            }
+
+            void genTree() {
+                t = new Tree();
+                t->root = new Node("call");
+                t->root->children.push_back(new Node(callee));
+                for (auto arg : args) {
+                    t->root->children.push_back(new Node(arg));
+                }
             }
     };
 
@@ -200,6 +332,11 @@ namespace L3 {
             std::string label;
             std::string toString() const {
                 return label;
+            }
+
+            void genTree() {
+                t = new Tree();
+                t->root = new Node(label);
             }
     };
 
