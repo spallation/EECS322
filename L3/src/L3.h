@@ -25,16 +25,16 @@ namespace L3 {
 // };
 
 enum Item_Type {
-    N1,
     NUMBER,
-    M,
-    E,
-    EM,
     VAR,
     LBL,
     T,
     U,
     S,
+    M,
+    E,
+    EM,
+    N1,
     ASGN,
     CMP,
     SHIFT,
@@ -66,6 +66,7 @@ enum Item_Type {
 class Node {
     public:
         std::string item;
+        std::string val;
         Item_Type ittp;
         std::vector< Node * > children;
 
@@ -137,6 +138,7 @@ class Node {
 class Tree {
     public:
         Node * root;
+        // std::vector<std::string> L2_instr_operands;
 
         void printTree() {
             root->printNode();
