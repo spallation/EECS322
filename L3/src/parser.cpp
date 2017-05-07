@@ -417,8 +417,12 @@ namespace L3 {
       cout << "function name: ";
       cout << in.string() << endl;
 
+      std::string o = in.string();
+      o.erase(remove(o.begin(), o.end(), '\n'), o.end());
+      o.erase(remove(o.begin(), o.end(), ' '), o.end());
+
       L3::Function *newF = new L3::Function();
-      newF->name = in.string();
+      newF->name = o;
       p.functions.push_back(newF);
 
       items.clear();
@@ -486,7 +490,7 @@ namespace L3 {
       L3::Function *currentF = p.functions.back();
       
       L3::Simple_Assign_Instruction *newI = new L3::Simple_Assign_Instruction();
-      newI->instr_type = L3::SIMPLE_ASSIGN;
+      // newI->instr_type = L3::SIMPLE_ASSIGN;
       
       newI->assign_right = items.back();
       items.pop_back();
@@ -507,7 +511,7 @@ namespace L3 {
       L3::Function *currentF = p.functions.back();
       
       L3::Op_Assign_Instruction *newI = new L3::Op_Assign_Instruction();
-      newI->instr_type = L3::OP_ASSIGN;
+      // newI->instr_type = L3::OP_ASSIGN;
       
       newI->op_right = items.back();
       items.pop_back();
@@ -532,7 +536,7 @@ namespace L3 {
       L3::Function *currentF = p.functions.back();
       
       L3::Cmp_Assign_Instruction *newI = new L3::Cmp_Assign_Instruction();
-      newI->instr_type = L3::CMP_ASSIGN;
+      // newI->instr_type = L3::CMP_ASSIGN;
       
       newI->cmp_right = items.back();
       items.pop_back();
@@ -557,7 +561,7 @@ namespace L3 {
       L3::Function *currentF = p.functions.back();
       
       L3::Load_Assign_Instruction *newI = new L3::Load_Assign_Instruction();
-      newI->instr_type = L3::LOAD_ASSIGN;
+      // newI->instr_type = L3::LOAD_ASSIGN;
       
       newI->var = items.back();
       items.pop_back();
@@ -576,7 +580,7 @@ namespace L3 {
       L3::Function *currentF = p.functions.back();
       
       L3::Store_Assign_Instruction *newI = new L3::Store_Assign_Instruction();
-      newI->instr_type = L3::STORE_ASSIGN;
+      // newI->instr_type = L3::STORE_ASSIGN;
       
       newI->assign_right = items.back();
       items.pop_back();
@@ -595,7 +599,7 @@ namespace L3 {
       L3::Function *currentF = p.functions.back();
       
       L3::Br1_Instruction *newI = new L3::Br1_Instruction();
-      newI->instr_type = L3::BR1;
+      // newI->instr_type = L3::BR1;
       
       newI->label = items.back();
       items.pop_back();
@@ -611,7 +615,7 @@ namespace L3 {
       L3::Function *currentF = p.functions.back();
       
       L3::Br2_Instruction *newI = new L3::Br2_Instruction();
-      newI->instr_type = L3::BR2;
+      // newI->instr_type = L3::BR2;
       
       newI->label2 = items.back();
       items.pop_back();
@@ -633,7 +637,7 @@ namespace L3 {
       L3::Function *currentF = p.functions.back();
       
       L3::Label_Instruction *newI = new L3::Label_Instruction();
-      newI->instr_type = L3::LABEL;
+      // newI->instr_type = L3::LABEL;
       
       newI->label = items.back();
       items.pop_back();
@@ -649,7 +653,7 @@ namespace L3 {
       L3::Function *currentF = p.functions.back();
       
       L3::Return_Instruction *newI = new L3::Return_Instruction();
-      newI->instr_type = L3::RETURN;
+      // newI->instr_type = L3::RETURN;
       
       currentF->instructions.push_back(newI);
 
@@ -664,7 +668,7 @@ namespace L3 {
       // cout << currentF->name << endl;
       
       L3::Var_Return_Instruction *newI = new L3::Var_Return_Instruction();
-      newI->instr_type = L3::VAR_RETURN;
+      // newI->instr_type = L3::VAR_RETURN;
       
       newI->var = items.back();
       items.pop_back();
@@ -680,7 +684,7 @@ namespace L3 {
       L3::Function *currentF = p.functions.back();
       
       L3::Call_Instruction *newI = new L3::Call_Instruction();
-      newI->instr_type = L3::CALL;
+      // newI->instr_type = L3::CALL;
       
       stack<std::string> arg_stack;
       while (!items.empty()) {
@@ -709,7 +713,7 @@ namespace L3 {
       L3::Function *currentF = p.functions.back();
       
       L3::Call_Assign_Instruction *newI = new L3::Call_Assign_Instruction();
-      newI->instr_type = L3::CALL_ASSIGN;
+      // newI->instr_type = L3::CALL_ASSIGN;
       
       stack<std::string> arg_stack;
       while (!items.empty()) {
