@@ -59,11 +59,8 @@ namespace L3 {
 
   struct label :
     pegtl::seq<
-      seps,
       pegtl::one<':'>,
-      seps,
-      var,
-      seps
+      var
     > {};
 
   struct number :
@@ -156,6 +153,10 @@ namespace L3 {
   struct function_name : opd {};
 
   struct function_args : vars {};
+
+  struct br_label : label {};
+
+  struct br_var : var {};
 
   struct op:
     pegtl::sor<
@@ -250,7 +251,7 @@ namespace L3 {
       seps,
       pegtl_string_t("br"),
       seps,
-      opd,
+      br_label,
       seps
     > {};
 
@@ -266,11 +267,11 @@ namespace L3 {
       seps,
       pegtl_string_t("br"),
       seps,
-      opd,
+      br_var,
       seps,
-      opd,
+      br_label,
       seps,
-      opd,
+      br_label,
       seps
     > {};
 
@@ -455,6 +456,32 @@ namespace L3 {
   template<> struct action < opd > {
     static void apply( const pegtl::input & in, L3::Program & p){
       cout << "opd: ";
+      cout << in.string() << endl;
+
+      std::string o = in.string();
+      o.erase(remove(o.begin(), o.end(), '\n'), o.end());
+      o.erase(remove(o.begin(), o.end(), ' '), o.end());
+
+      items.push_back(o);
+    }
+  };
+
+  template<> struct action < br_label > {
+    static void apply( const pegtl::input & in, L3::Program & p){
+      cout << "br_label: ";
+      cout << in.string() << endl;
+
+      std::string o = in.string();
+      o.erase(remove(o.begin(), o.end(), '\n'), o.end());
+      o.erase(remove(o.begin(), o.end(), ' '), o.end());
+
+      items.push_back(o);
+    }
+  };
+
+  template<> struct action < br_var > {
+    static void apply( const pegtl::input & in, L3::Program & p){
+      cout << "br_var: ";
       cout << in.string() << endl;
 
       std::string o = in.string();

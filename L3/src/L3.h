@@ -57,6 +57,38 @@ enum Item_Type {
     RETURN
 };
 
+enum L2_Tile_Type {
+    LEFT_MEM_PLUS,
+    LEFT_MEM_MINUS,
+    RIGHT_MEM_PLUS,
+    RIGHT_MEM_MINUS,
+    LEFT_MEM_ASSIGN,
+    RIGHT_MEM_ASSIGN,
+    LEA,
+    INC,
+    DEC,
+    AOP_SOP_CMP_ASGN_PLUS,
+    AOP_SOP_CMP_ASGN_MINUS,
+    AOP_SOP_CMP_ASGN_MUL,
+    AOP_SOP_CMP_ASGN_AD,
+    AOP_SOP_CMP_ASGN_CMP,
+    AOP_SOP_CMP_ASGN_SHIFT,
+    AOP_SOP_CMP_PLUS,
+    AOP_SOP_CMP_MINUS,
+    AOP_SOP_CMP_MUL,
+    AOP_SOP_CMP_AD,
+    AOP_SOP_CMP_CMP,
+    AOP_SOP_CMP_SHIFT,
+    SIMPLE_ASSIGN,
+    CJUMP,
+    TILE_LABEL,
+    GOTO,
+    TILE_RETURN,
+    TILE_VAR_RETURN,
+    TILE_CALL,
+    TILE_CALL_ASGN
+};
+
 // enum Callee_Type {
 //     PRINT,
 //     ALLOCATE,
@@ -66,45 +98,61 @@ enum Item_Type {
 class Node {
     public:
         std::string item;
-        std::string val;
         Item_Type ittp;
+        Item_Type second_ittp;
+
+        std::string val;
+        Item_Type val_ittp;
         std::vector< Node * > children;
 
         Node () {}
-        Node (std::string it) {
+        // Node (std::string it) {
+        //     item = it;
+        //     check_item();
+        // }
+        Node (Item_Type itp) : ittp(itp) {}
+        Node (std::string it, Item_Type itp) {
             item = it;
+            ittp = itp;
+            second_ittp = itp;
+            set_second_ittp();
+        }
+
+        void set_second_ittp() {
+            if (item.empty()) return;
+            // if (item == "4") cout << "here" << endl;
             int n;
-            if (isdigit(item.at(0)) || ((item.at(0)=='+' || item.at(0)=='-') && isdigit(item.at(1)))) {
+            if (item.size() == 1) {
+                if (isdigit(item.at(0))) n = std::stoi(item);
+                else return;
+            }
+            else if (isdigit(item.at(0))) {
+                n = std::stoi(item);
+            }
+            else if ((item.at(0)=='+' || item.at(0)=='-') && isdigit(item.at(1))) {
                 if (item.at(0) == '-') {
-                    ittp = NUMBER;
+                    return;
                 }
-                else {
-                    if (isdigit(item.at(0))) {
-                        n = std::stoi(item);
-                    }
-                    else {
-                        n = std::stoi(item.substr(1));
-                    }
-                    if (n == 0 || n == 8) {
-                        ittp = EM;
-                    }
-                    else if (n == 2 || n == 4) {
-                        ittp = E;
-                    }
-                    else if (n % 8 == 0) {
-                        ittp = M;
-                    }
-                    else if (n == 1) {
-                        ittp = N1;
-                    }
-                    else {
-                        ittp = NUMBER;
-                    }
-                }
+                n = std::stoi(item.substr(1));
+            }
+            else return;
+
+            if (n == 0 || n == 8) {
+                second_ittp = EM;
+            }
+            else if (n == 2 || n == 4) {
+                second_ittp = E;
+            }
+            else if (n % 8 == 0) {
+                second_ittp = M;
+            }
+            else if (n == 1) {
+                second_ittp = N1;
+            }
+            else {
+                return;
             }
         }
-        Node (Item_Type itp) : ittp(itp) {}
-        Node (std::string it, Item_Type itp) : item(it), ittp(itp) {}
 
         bool operator==(Node * another_node) {
             if (!another_node) {
@@ -114,7 +162,7 @@ class Node {
         }
 
         void printNode() {
-            cout << item << "(" << ittp << ") ";
+            cout << item << "(" << ittp << ", " << second_ittp << ", " << val << ", " << val_ittp << ") ";
             if (!children.empty()) {
                 for (auto ch : children) {
                     if (ch)
@@ -123,6 +171,30 @@ class Node {
             }
         }
 
+        // bool isStrDigit(std::string s) {
+        //     if (s.empty()) return false;
+        //     if (isdigit(item.at(0))) {
+        //         return true;
+        //     }
+        //     else if ((item.at(0)=='+' || item.at(0)=='-') && isdigit(item.at(1))) {
+        //         return true;
+        //     }
+        //     else return false;
+        // }
+
+        void set_val_ittp(std::string v) {
+            val = v;
+            val_ittp = L3::S;
+            // for (auto ch : children) {
+            //     if (!isStrDigit(ch->item)) {
+            //         val = ch->item;
+            //         val_ittp = L3::T;
+            //         return;
+            //     }
+            // }
+            // val = "";
+            // val_ittp = ittp;
+        }
         // void 
         // Node(std::string it, std::vector<std::string> vec) {
         //     item = it;
@@ -139,6 +211,7 @@ class Tree {
     public:
         Node * root;
         // std::vector<std::string> L2_instr_operands;
+        L2_Tile_Type tile_type;
 
         void printTree() {
             root->printNode();
@@ -223,11 +296,12 @@ class Op_Assign_Instruction : public Instruction {
                 // cout << "Unknown op." << endl;
             }
 
-
             assign_right->children.push_back(new Node(op_left, T));
             // cout << '2' << endl;
 
             assign_right->children.push_back(new Node(op_right, T));
+
+            assign_right->set_val_ittp(assign_left);
             
             t->root->children.push_back(new Node(assign_left, VAR));
             t->root->children.push_back(assign_right);
@@ -296,6 +370,8 @@ class Cmp_Assign_Instruction : public Instruction {
             assign_right->children.push_back(new Node(cmp_left, T));
             assign_right->children.push_back(new Node(cmp_right, T));
 
+            assign_right->set_val_ittp(assign_left);
+
             t->root->children.push_back(new Node(assign_left, VAR));
             t->root->children.push_back(assign_right);
 
@@ -331,6 +407,8 @@ class Load_Assign_Instruction : public Instruction {
             Node *assign_right = new Node("load", LOAD);
             assign_right->children.push_back(new Node(var, VAR));
             
+            assign_right->set_val_ittp(assign_left);
+
             t->root->children.push_back(new Node(assign_left, VAR));
             t->root->children.push_back(assign_right);
 
@@ -358,6 +436,8 @@ class Store_Assign_Instruction : public Instruction {
 
             Node *assign_left = new Node("store", STORE);
             assign_left->children.push_back(new Node(var, VAR));
+
+            assign_left->set_val_ittp(assign_right);
 
             t->root->children.push_back(assign_left);
             t->root->children.push_back(new Node(assign_right, S));
@@ -413,6 +493,8 @@ class Call_Assign_Instruction : public Instruction {
             for (auto arg : args) {
                 assign_right->children.push_back(new Node(arg, T));
             }
+
+            assign_right->set_val_ittp(assign_left);
 
             t->root->children.push_back(new Node(assign_left, VAR));
             t->root->children.push_back(assign_right);
