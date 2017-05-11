@@ -415,8 +415,8 @@ namespace L3 {
 
   template<> struct action < function_name > {
     static void apply( const pegtl::input & in, L3::Program & p){
-      cout << "function name: ";
-      cout << in.string() << endl;
+      // cout << "function name: ";
+      // cout << in.string() << endl;
 
       std::string o = in.string();
       o.erase(remove(o.begin(), o.end(), '\n'), o.end());
@@ -432,8 +432,8 @@ namespace L3 {
 
   template<> struct action < function_args > {
     static void apply( const pegtl::input & in, L3::Program & p){
-      cout << "function arg: ";
-      cout << in.string() << endl;
+      // cout << "function arg: ";
+      // cout << in.string() << endl;
 
       L3::Function *currentF = p.functions.back();
       
@@ -455,12 +455,17 @@ namespace L3 {
 
   template<> struct action < opd > {
     static void apply( const pegtl::input & in, L3::Program & p){
-      cout << "opd: ";
-      cout << in.string() << endl;
+      // cout << "opd: ";
+      // cout << in.string() << endl;
+      L3::Function *currentF = p.functions.back();
 
       std::string o = in.string();
       o.erase(remove(o.begin(), o.end(), '\n'), o.end());
       o.erase(remove(o.begin(), o.end(), ' '), o.end());
+
+      if (!o.empty() && o.at(0) == ':') {
+        currentF->labels.insert(o);
+      }
 
       items.push_back(o);
     }
@@ -468,12 +473,15 @@ namespace L3 {
 
   template<> struct action < br_label > {
     static void apply( const pegtl::input & in, L3::Program & p){
-      cout << "br_label: ";
-      cout << in.string() << endl;
+      // cout << "br_label: ";
+      // cout << in.string() << endl;
+      L3::Function *currentF = p.functions.back();
 
       std::string o = in.string();
       o.erase(remove(o.begin(), o.end(), '\n'), o.end());
       o.erase(remove(o.begin(), o.end(), ' '), o.end());
+
+      currentF->labels.insert(o);
 
       items.push_back(o);
     }
@@ -481,8 +489,8 @@ namespace L3 {
 
   template<> struct action < br_var > {
     static void apply( const pegtl::input & in, L3::Program & p){
-      cout << "br_var: ";
-      cout << in.string() << endl;
+      // cout << "br_var: ";
+      // cout << in.string() << endl;
 
       std::string o = in.string();
       o.erase(remove(o.begin(), o.end(), '\n'), o.end());
@@ -494,8 +502,8 @@ namespace L3 {
 
   template<> struct action < op > {
     static void apply( const pegtl::input & in, L3::Program & p){
-      cout << "op: ";
-      cout << in.string() << endl;
+      // cout << "op: ";
+      // cout << in.string() << endl;
 
       items.push_back(in.string());
     }
@@ -503,8 +511,8 @@ namespace L3 {
 
   template<> struct action < cmp > {
     static void apply( const pegtl::input & in, L3::Program & p){
-      cout << "cmp: ";
-      cout << in.string() << endl;
+      // cout << "cmp: ";
+      // cout << in.string() << endl;
 
       items.push_back(in.string());
     }
@@ -766,6 +774,19 @@ namespace L3 {
       items.clear();
     }
   };
+
+  // template<> struct action < L3_instruction_rule > {
+  //   static void apply( const pegtl::input & in, L3::Program & p){
+  //     cout << in.string() << endl;
+  //   }
+  // };
+
+  // template<> struct action < L3_function_rule > {
+  //   static void apply( const pegtl::input & in, L3::Program & p){
+  //     cout << in.string() << endl;
+  //   }
+  // };
+  
 
   Program L3_parse_file (char *fileName){
 

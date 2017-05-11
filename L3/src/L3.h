@@ -226,6 +226,7 @@ class Instruction {
 
         virtual std::string toString() const { return ""; }
         virtual Tree * genTree() { return t; }
+        virtual void replace_label(std::string, std::string) { return; }
 
         void printTree() { t->printTree(); }
         Tree * getTree() { return t; }
@@ -522,6 +523,12 @@ class Br1_Instruction : public Instruction {
             t->root->children.push_back(new Node(label, LBL));
             return t;
         }
+
+        void replace_label(std::string oldL, std::string newL) {
+            if (label == oldL) {
+                label = newL;
+            }
+        }
 };
 
 class Br2_Instruction : public Instruction {
@@ -547,6 +554,15 @@ class Br2_Instruction : public Instruction {
             t->root->children.push_back(new Node(label1, LBL));
             t->root->children.push_back(new Node(label2, LBL));
             return t;
+        }
+
+        void replace_label(std::string oldL, std::string newL) {
+            if (label1 == oldL) {
+                label1 = newL;
+            }
+            if (label2 == oldL) {
+                label2 = newL;
+            }
         }
 };
 
@@ -647,6 +663,12 @@ class Label_Instruction : public Instruction {
             t->root = new Node(label, LBL);
             return t;
         }
+
+        void replace_label(std::string oldL, std::string newL) {
+            if (label == oldL) {
+                label = newL;
+            }
+        }
 };
 
 // class L2_Simple_Assign_Instruction : Instruction {
@@ -682,6 +704,7 @@ class Function{
         int64_t locals;
         std::vector<L3::Instruction *> instructions;
         std::vector<std::string> args;
+        std::set<std::string> labels;
         //std::set<string> callee_registers_to_save;
 };
 
@@ -689,5 +712,6 @@ class Program{
     public:
         std::string entryPointLabel;
         std::vector<L3::Function *> functions;
+        int64_t label_suffix;
 };
 } // L3

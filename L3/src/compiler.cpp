@@ -27,6 +27,34 @@ std::vector<std::string> H1_sorted_color = {"r10", "r11", "r8", "r9", "rax", "rc
 
 std::map<std::string, int> function_invokeNum;
 
+bool label_exist(std::vector<L3::Function *> functions, int i, std::string l) {
+  for (int j = 0; j < functions.size(); j++) {
+    if (functions[i]->labels.find(l) != functions[i]->labels.end()) {
+      return true;
+    }
+  }
+  return false;
+}
+
+void add_suffix_to_label(L3::Program &p) {
+  for (int i = 0; i < p.functions.size(); i++) {
+    for (auto l : p.functions[i]->labels) {
+      std::string new_label = l;
+      while (label_exist(p.functions, i, new_label)) {
+        new_label += std::to_string(p.label_suffix++);
+      }
+      if (new_label != l) {
+        p.functions[i]->labels.erase(l);
+        p.functions[i]->labels.insert(new_label);
+
+        for (auto instr : p.functions[i]->instructions) {
+          instr->replace_label(l,new_label);
+        }
+      }
+    }
+  }
+}
+
 bool isStrDigit(std::string s) {
     if (s.empty()) return false;
     if (isdigit(s.at(0))) {
@@ -67,11 +95,11 @@ bool node_eq(L3::Node * n1, L3::Node * n2) {
     return true;
   }
   if (!n1->val.empty()) {
-    if (n2->ittp == L3::N1) {
-      cout << "n2 is N1" << endl;
-      n1->printNode();
-      cout << endl;
-    }
+    // if (n2->ittp == L3::N1) {
+    //   cout << "n2 is N1" << endl;
+    //   n1->printNode();
+    //   cout << endl;
+    // }
     return item_type_eq(n1->val_ittp, n2->ittp);
   }
 }
@@ -126,6 +154,12 @@ bool merge_tree(L3::Tree * t, L3::Tree * merged_tree) {
   if ((merged_tree->root->item == "return" 
     || merged_tree->root->item == "call" 
     || merged_tree->root->item == "br") && (alter_var->ittp >= L3::ASGN)) {
+      return false;
+  }
+
+  if ((merged_tree->root->item == "<-" 
+    && merged_tree->root->children[1]->item == "call")
+     && (alter_var->ittp >= L3::ASGN)) {
       return false;
   }
 
@@ -790,38 +824,44 @@ std::string write_L2_gen_lea_tree(L3::Tree * t) {
 }
 
 std::string write_L2_gen_inc_tree(L3::Tree * t) {
-  std::string w, tmp, inst;
+  std::string w, tmp, inst, var_str;
 
   w = t->root->children[0]->item;
   
   tmp = t->root->children[1]->children[0]->item;
+  var_str = t->root->children[1]->children[0]->val;
   if (tmp == "1") {
     tmp = t->root->children[1]->children[1]->item;
+    var_str = t->root->children[1]->children[1]->val;
   }
 
   inst = "";
-  if(isStrDigit(tmp)) {
+  if(isStrDigit(tmp) || (w != tmp && w != var_str)) {
     inst += "(" + w + " <- " + tmp + ")\n";
   }
+  
   inst += "(" + w + "++)\n";
 
   return inst;
 }
 
 std::string write_L2_gen_dec_tree(L3::Tree * t) {
-  std::string w, tmp, inst;
+  std::string w, tmp, inst, var_str;
 
   w = t->root->children[0]->item;
-
+  
   tmp = t->root->children[1]->children[0]->item;
+  var_str = t->root->children[1]->children[0]->val;
   if (tmp == "1") {
     tmp = t->root->children[1]->children[1]->item;
+    var_str = t->root->children[1]->children[1]->val;
   }
 
   inst = "";
-  if(isStrDigit(tmp)) {
+  if(isStrDigit(tmp) || (w != tmp && w != var_str)) {
     inst += "(" + w + " <- " + tmp + ")\n";
   }
+  
   inst += "(" + w + "--)\n";
 
   return inst;
@@ -945,7 +985,15 @@ std::string write_L2_gen_call_tree(L3::Tree * t) {
   std::vector<std::string> args_vec;
   std::string callee = t->root->children[0]->item;
   for (int i = 1; i < t->root->children.size(); i++) {
-    args_vec.push_back(t->root->children[i]->item);
+    L3::Node * ch = t->root->children[i];
+    // if (ch->ittp >= L3::ASGN) {
+    //   args_vec.push_back(ch->val);
+      // t->root->children[i]->printNode();
+      // cout << endl;
+    // }
+    // else {
+      args_vec.push_back(t->root->children[i]->item);
+    // }
   }
 
 
@@ -991,11 +1039,99 @@ std::string write_L2_gen_call_assign_tree(L3::Tree * t) {
   return inst;
 }
 
+// void write_tile(L3::Tree * t) {
+//   switch (t->tile_type) {
+//     case L3::LEFT_MEM_PLUS :
+//     case L3::LEFT_MEM_MINUS :
+//       s += write_L2_gen_left_mem_plus_minus_tree(t,t->tile_type);
+//       break;
+//     case L3::RIGHT_MEM_PLUS :
+//     case L3::RIGHT_MEM_MINUS :
+//       s +=  write_L2_gen_right_mem_plus_minus_tree(t,t->tile_type);
+//       break;
+//     case L3::LEFT_MEM_ASSIGN :
+//       s +=  write_L2_gen_left_mem_assign_tree(t);
+//       break;
+//     case L3::RIGHT_MEM_ASSIGN :
+//       s +=  write_L2_gen_right_mem_assign_tree(t);
+//       break;
+//     case L3::LEA :
+//       s +=  write_L2_gen_lea_tree(t);
+//       break;
+//     case L3::INC :
+//       s +=  write_L2_gen_inc_tree(t);
+//       break;
+//     case L3::DEC :
+//       s +=  write_L2_gen_dec_tree(t);
+//       break;
+//     case L3::AOP_SOP_CMP_ASGN_PLUS :
+//       s +=  write_L2_gen_aop_sop_cmp_asgn(t,L3::PLUS);
+//       break;
+//     case L3::AOP_SOP_CMP_ASGN_MINUS :
+//       s +=  write_L2_gen_aop_sop_cmp_asgn(t,L3::MINUS);
+//       break;
+//     case L3::AOP_SOP_CMP_ASGN_MUL :
+//       s +=  write_L2_gen_aop_sop_cmp_asgn(t,L3::MUL);
+//       break;
+//     case L3::AOP_SOP_CMP_ASGN_AD :
+//       s +=  write_L2_gen_aop_sop_cmp_asgn(t,L3::AD);
+//       break;
+//     case L3::AOP_SOP_CMP_ASGN_CMP :
+//       s +=  write_L2_gen_aop_sop_cmp_asgn(t,L3::CMP);
+//       break;
+//     case L3::AOP_SOP_CMP_ASGN_SHIFT :
+//       s +=  write_L2_gen_aop_sop_cmp_asgn(t,L3::SHIFT);
+//       break;
+//     case L3::AOP_SOP_CMP_PLUS :
+//       s +=  write_L2_gen_aop_sop_cmp(t,L3::PLUS);
+//       break;
+//     case L3::AOP_SOP_CMP_MINUS :
+//       s +=  write_L2_gen_aop_sop_cmp(t,L3::MINUS);
+//       break;
+//     case L3::AOP_SOP_CMP_MUL :
+//       s +=  write_L2_gen_aop_sop_cmp(t,L3::MUL);
+//       break;
+//     case L3::AOP_SOP_CMP_AD :
+//       s +=  write_L2_gen_aop_sop_cmp(t,L3::AD);
+//       break;
+//     // case L3::AOP_SOP_CMP_CMP :
+//     //   s +=  write_L2_gen_aop_sop_cmp(t,L3::CMP);
+//     case L3::AOP_SOP_CMP_SHIFT :
+//       s +=  write_L2_gen_aop_sop_cmp(t,L3::SHIFT);
+//       break;
+//     case L3::SIMPLE_ASSIGN :
+//       s +=  write_L2_gen_simple_assign_tree(t);
+//       break;
+//     case L3::CJUMP :
+//       s +=  write_L2_gen_cjump_tree(t);
+//       break;
+//     case L3::TILE_LABEL :
+//       s +=  write_L2_gen_label_tree(t);
+//       break;
+//     case L3::GOTO :
+//       s +=  write_L2_gen_goto_tree(t);
+//       break;
+//     case L3::TILE_RETURN :
+//       s +=  write_L2_gen_return_tree(t);
+//       break;
+//     case L3::TILE_VAR_RETURN:
+//       s +=  write_L2_gen_return_var_tree(t);
+//       break;
+//     case L3::TILE_CALL:
+//       s +=  write_L2_gen_call_tree(t);
+//       break;
+//     case L3::TILE_CALL_ASGN:
+//       s += write_L2_gen_call_assign_tree(t);
+//       break;
+//     default:
+//       cout << "Unknown tile type." << t->tile_type << endl;
+//   }
+// }
+
 std::string write_tiles(std::vector<L3::Tree *> matched_tiles) {
   std::string s = "";
 
   for (auto t : matched_tiles) {
-    
     switch (t->tile_type) {
       case L3::LEFT_MEM_PLUS :
       case L3::LEFT_MEM_MINUS :
@@ -1113,6 +1249,9 @@ int main(
   }
 
   L3::Program p = L3::L3_parse_file(argv[optind]);
+  p.label_suffix = 0;
+
+  add_suffix_to_label(p);
 
   std::string program_str = "";
   program_str += "(:main\n";
@@ -1136,6 +1275,14 @@ int main(
     std::vector<L3::Tree *> tiles =  generate_L2_tiles();
 
     std::vector<L3::Tree *> matched_tiles;
+
+    cout << "printing new forest:" << endl;
+    for (auto t : merged_forest) {
+      if (t)
+        t->printTree();
+    }
+    cout << endl;
+
     std::vector<L3::Tree *> current_matched_tiles;
 
     for (auto tr : merged_forest) {
