@@ -600,6 +600,7 @@ namespace L2 {
       // cout << in.string() << endl;
       L2::Instruction *newI = new L2::Instruction();
       newI->operands.push_back(in.string());
+      currentF->vars.insert(in.string());
       currentF->instructions.push_back(newI);
     }
   };
@@ -623,6 +624,7 @@ namespace L2 {
       // and it is not lea instruction
       if (!currentI->is_right_mem && currentI->cmp_opt.empty() && currentI->opt != "@" && currentI->stack_opt.empty()) {
         currentI->operands.push_back(in.string());
+        currentF->vars.insert(in.string());
       }
     }
   };
@@ -681,6 +683,7 @@ namespace L2 {
       L2::Function *currentF = p.functions.back();
       L2::Instruction *currentI = currentF->instructions.back();
       currentI->operands.push_back(in.string());
+      currentF->vars.insert(in.string());
     }
   };
 
@@ -700,6 +703,7 @@ namespace L2 {
       // cout << "call_function_name" << endl; 
       L2::Instruction *newI = new L2::Instruction();
       newI->operands.push_back(in.string());
+      currentF->vars.insert(in.string());
       newI->opt = "call";
       currentF->instructions.push_back(newI);
     }
@@ -725,6 +729,7 @@ namespace L2 {
       // If this is a cmp instruction, we push temp_operand into operands list 
       // in the action of cmp_right.
       currentI->temp_operand = in.string();
+      currentF->vars.insert(in.string());
     }
   };
 
@@ -733,6 +738,7 @@ namespace L2 {
       L2::Function *currentF = p.functions.back();
       L2::Instruction *currentI = currentF->instructions.back();
       currentI->cmp_opt = in.string();
+
     }
   };
 
@@ -744,6 +750,8 @@ namespace L2 {
       L2::Instruction *currentI = currentF->instructions.back();
       currentI->operands.push_back(currentI->temp_operand);
       currentI->operands.push_back(in.string());
+      currentF->vars.insert(in.string());
+      currentF->vars.insert(currentI->temp_operand);
     }
   };
 
@@ -798,6 +806,7 @@ namespace L2 {
       L2::Function *currentF = p.functions.back();
       L2::Instruction *currentI = currentF->instructions.back();
       currentI->temp_operand = in.string();
+      currentF->vars.insert(in.string());
       // currentI->operands.push_back(in.string());
     }
   };
@@ -810,6 +819,7 @@ namespace L2 {
       L2::Instruction *currentI = currentF->instructions.back();
       currentI->operands.push_back(currentI->temp_operand);
       currentI->operands.push_back(in.string());
+      currentF->vars.insert(in.string());
     }
   };
 
@@ -855,6 +865,14 @@ namespace L2 {
       // cout << in.string() << endl;
     }
   };
+
+  //  template<> struct action < var > {
+  //   static void apply( const pegtl::input & in, L2::Program & p) {
+  //     L2::Function *currentF = p.functions.back();
+  //     cout << in.string() << endl;
+  //     currentF->vars.insert(in.string());
+  //   }
+  // };
 
   Program L2_parse_file (char *fileName){
 

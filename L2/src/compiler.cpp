@@ -39,6 +39,14 @@ std::vector<std::string> H1_sorted_color = {"r10", "r11", "r8", "r9", "rax", "rc
 
 // std::vector<std::string> temp = {"rdi", "r10", "rax"};
 
+std::string convert_to_suffix(int n) {
+  return n == 0 ? "" : convert_to_suffix(--n/26) + (char)('A'+n%26);
+}
+
+bool var_exists_in_function(std::string v, L2::Function *f) {
+  return (f->vars.find(v) != f->vars.end());
+}
+
 void print_instruction(L2::Instruction *i) {
   cout << "instruction has opt " << i->opt;
   if (!i->mem_opt.empty()) {
@@ -722,7 +730,13 @@ void replace_old_instruction(L2::Function *f,
                              std::vector<L2::Instruction *> & new_instructions,
                             int i, string v, int stack_loc) {
 
-  string s_var = "S" + to_string(stack_loc/8);
+  // string s_var = "S" + to_string(stack_loc/8);
+  int suffix = 0;
+  string s_var = convert_to_suffix(suffix) + to_string(stack_loc/8);
+  while (var_exists_in_function(s_var,f)) {
+    s_var = convert_to_suffix(++suffix) + to_string(stack_loc/8);
+  }
+  cout << s_var << endl;
   // cout << f->instructions[i]->opt << "(";
   for (vector<string>::iterator it = f->instructions[i]->operands.begin(); it < f->instructions[i]->operands.end(); it++) {
     // cout << *it;
@@ -754,8 +768,13 @@ void replace_writes_to_v(L2::Function *f,
                          std::vector<L2::Instruction *> & new_instructions,
                          int i, string v, int stack_loc) {
   // int num_of_writes_to_v = get_writes_idx(*it, v);
-  string s_var = "S" + to_string(stack_loc/8);
-  // cout << s_var << endl;
+  // string s_var = "S" + to_string(stack_loc/8);
+  int suffix = 0;
+  string s_var = convert_to_suffix(suffix) + to_string(stack_loc/8);
+  while (var_exists_in_function(s_var,f)) {
+    s_var = convert_to_suffix(++suffix) + to_string(stack_loc/8);
+  }
+  cout << s_var << endl;
 
   int num_of_writes_to_v = count_var_in_set(v,f->instructions[i]->GEN);
   // cout << num_of_writes_to_v << endl;
@@ -787,8 +806,13 @@ void replace_reads_from_v(L2::Function *f,
     return;
   }
   // cout << "replace_reads_from_v" << endl;
-  string s_var = "S" + to_string(stack_loc/8);
-  // cout << s_var << endl;
+  // string s_var = "S" + to_string(stack_loc/8);
+  int suffix = 0;
+  string s_var = convert_to_suffix(suffix) + to_string(stack_loc/8);
+  while (var_exists_in_function(s_var,f)) {
+    s_var = convert_to_suffix(++suffix) + to_string(stack_loc/8);
+  }
+  cout << s_var << endl;
   
   L2::Instruction *newI = new L2::Instruction();
   // newI->instr_string = "(mem rsp 0) <-";
@@ -814,7 +838,7 @@ void replace_reads_from_v(L2::Function *f,
   // cout << new->instr_string << endl;
 }
 
-void spill(L2::Function *f, string v, string s) {
+void spill(L2::Function *f, string v) {
   cout << "spill " << v << endl;
 
   std::vector<L2::Instruction *> new_instructions;
@@ -1142,6 +1166,10 @@ int main(
 
   for (auto f : p.functions) {
 
+    // for (auto v : f->vars) {
+    //   cout << v << endl;
+    // }
+
     // cout << "^^^" << endl;
     translate_stack_arg(f);    
 
@@ -1197,7 +1225,7 @@ int main(
 
       while (!spill_stack.empty()) {
         string v = spill_stack.top();
-        spill(f, v, "S");
+        spill(f, v);
         spill_stack.pop();
       }
 
