@@ -31,6 +31,12 @@ void print_instruction(IR::Instruction *i) {
   cout << i->toString() << endl;
 }
 
+std::string remove_percent(std::string s) {
+    if (!s.empty() && s.at(0) == '%') {
+        s = s.substr(1);
+    }
+    return s;
+}
 
 int main(
   int argc, 
@@ -80,5 +86,25 @@ int main(
     cout << endl;
   }
 
+  cout << "After translating:" << endl;
+  for (auto f : p.functions) {
+    cout << f->return_type << " ";
+    cout << f->name;
+    
+    for (auto arg : f->args) {
+      cout << " " << remove_percent(arg);
+    }
+    cout << endl;
+    for (auto bb : f->bbs) {
+      cout << bb->label << endl;
+      int n = 1;
+      for (auto i : bb->instructions) {
+        cout << n++ << ": ";
+        cout << i->translate_to_L3(bb);
+      }
+      cout << bb->terminator->translate_to_L3(bb);
+    }
+    cout << endl;
+  }
   return 0;
 }

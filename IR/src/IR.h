@@ -4,14 +4,122 @@
 #include <sstream>
 #include <string>
 #include <iostream>
+#include <map>
 
 using namespace std;
 
 namespace IR {
 
+class Instruction;
+
+enum VAR_TYPE { INT64, TUPLE, CODE };
+
+class BB{
+    public:
+        std::string label;
+        std::vector<IR::Instruction *> instructions;
+        IR::Instruction * terminator;
+
+        std::map<std::string, VAR_TYPE> var_type_map;
+        std::set<std::string> var_set;
+        int64_t var_suffix;
+};
+
+class Function{
+    public:
+        std::string name;
+        std::string return_type;
+        std::vector<std::string> args;
+        std::vector<BB *> bbs;
+        std::set<std::string> labels;
+        //std::set<string> callee_registers_to_save;
+};
+
+class Program{
+    public:
+        std::string entryPointLabel;
+        std::vector<IR::Function *> functions;
+        int64_t label_suffix;
+};
+
 class Instruction {
     public:
         virtual std::string toString() const { return ""; }
+        virtual std::string translate_to_L3(IR::BB *b) { return ""; }
+        
+        std::string create_var_with_suffix(IR::BB *b) {
+            std::string v = "tv" + std::to_string(b->var_suffix++);
+            while (b->var_set.find(v) != b->var_set.end()) {
+                v = "tv" + std::to_string(b->var_suffix++);
+            }
+            b->var_set.insert(v);
+            return v;
+        }
+        std::string translate_array_assign(IR::BB *b, 
+            std::string array_name, std::vector<std::string> indices,
+            std::string var, bool is_left) { 
+
+            std::string A = remove_percent(array_name);
+
+            std::string k = indices[0];
+            std::string i = indices[1];
+            std::string j = indices[2];
+
+            std::string ADDR_M = create_var_with_suffix(b);
+            std::string M_ = create_var_with_suffix(b);
+            std::string M = create_var_with_suffix(b);
+            std::string ADDR_N = create_var_with_suffix(b);
+            std::string N_ = create_var_with_suffix(b);
+            std::string N = create_var_with_suffix(b);
+            std::string M_N = create_var_with_suffix(b);
+            // std::string M = create_var_with_suffix(b);
+
+            std::string newVar1 = create_var_with_suffix(b);
+            std::string newVar2 = create_var_with_suffix(b);
+            std::string newVar3 = create_var_with_suffix(b);
+
+            std::string index = create_var_with_suffix(b);
+            std::string offsetAfterB = create_var_with_suffix(b);
+            std::string offset = create_var_with_suffix(b);
+            std::string addr = create_var_with_suffix(b);
+
+            std::string inst = "";
+            
+            inst += ADDR_M + " <- " + A + " + 24\n";
+            inst += M_ + " <- load " + ADDR_M + "\n";
+            inst += M  + " <- " + M_ + " >> 1\n";
+
+            inst += ADDR_N + " <- " + A + " + 32\n";
+            inst += N_ + " <- load " + ADDR_N + "\n";
+            inst += N + " <- " + N_ + " >> 1\n";
+
+            inst += newVar1 + " <- " + i + " * " + N + "\n";
+            inst += M_N + " <- " + M + " * " + N + "\n";
+            inst += newVar2 + " <- " + k + " * " + M_N + "\n";
+            inst += newVar3 + " <- " + newVar2 + " + " + newVar1 + "\n";
+
+
+            inst += index + " <- " + newVar3 + " + " + j + "\n";
+            inst += offsetAfterB + " <- " + index + " * 8\n";
+            inst += offset + " <- " + offsetAfterB + " + 40\n";
+            inst += addr + " <- " + A + " + " + offset + "\n";
+
+            if (is_left) {
+                inst += "store " + addr + " <- " + var + "\n";
+            }
+            else {
+                inst += var + " <- load " + addr + "\n";
+            }
+
+            return inst;
+        }
+
+        std::string remove_percent(std::string s) {
+            if (!s.empty() && s.at(0) == '%') {
+                s = s.substr(1);
+            }
+            return s;
+        }
         // virtual void replace_label(std::string, std::string) { return; }
 };
 
@@ -28,6 +136,21 @@ class Type_Instruction : public Instruction {
             s += type + " " + var;
             return s;
         }
+
+        std::string translate_to_L3(IR::BB *b) {
+            std::string v = remove_percent(var);
+            if (type == "tuple") {
+                b->var_type_map[v] = IR::TUPLE;
+            }
+            else if (type == "code") {
+                b->var_type_map[v] = IR::CODE;
+            }
+            else {
+                b->var_type_map[v] = IR::INT64;
+            }
+            b->var_set.insert(v);
+            return "";
+        }
 };
 
 class Simple_Assign_Instruction : public Instruction {
@@ -42,6 +165,15 @@ class Simple_Assign_Instruction : public Instruction {
         std::string toString() const {
             std::string s("");
             s += assign_left + " <- " + assign_right;
+            return s;
+        }
+
+        std::string translate_to_L3(IR::BB *b) {
+            std::string s("");
+            std::string al = remove_percent(assign_left);
+            std::string ar = remove_percent(assign_right);
+
+            s += al + " <- " + ar + "\n";
             return s;
         }
 };
@@ -61,6 +193,10 @@ class Op_Assign_Instruction : public Instruction {
             std::string s("");
             s += assign_left + " <- " + op_left + " " + op + " " + op_right;
             return s;
+        }
+
+        std::string translate_to_L3(IR::BB *b) {
+            return remove_percent(assign_left) + " <- " + remove_percent(op_left) + " " + op + " " + remove_percent(op_right) + "\n";
         }
 };
 
@@ -87,6 +223,24 @@ class Right_Array_Assign_Instruction : public Instruction {
             std::string s("");
             s += assign_left + " <- " + array_name + "[" + oss.str() + "]";
             return s;
+        }
+
+        std::string translate_to_L3(IR::BB *b) {
+            if (b->var_type_map[remove_percent(array_name)] == IR::INT64) {
+                cout << "666666" << endl;
+                return translate_array_assign(b, array_name, indices, remove_percent(assign_left), false);
+            }
+            else if (b->var_type_map[remove_percent(array_name)] == IR::TUPLE) {
+                cout << "777777" << endl;
+                std::string newVar = create_var_with_suffix(b);
+                std::string inst = "";
+                inst += newVar + " <- " + remove_percent(array_name) + " + " + std::to_string((std::stoi(indices[0])+1)*8) + "\n";
+                inst += remove_percent(assign_left) + " <- load " + newVar + "\n";
+                return inst;
+            }
+            else {
+                cout << "Wrong var type in Right_Array_Assign_Instruction." << endl;
+            }
         }
 
 };
@@ -116,6 +270,22 @@ class Left_Array_Assign_Instruction : public Instruction {
             return s;
         }
 
+        std::string translate_to_L3(IR::BB *b) {
+            if (b->var_type_map[remove_percent(array_name)] == IR::INT64) {
+                return translate_array_assign(b, array_name, indices, remove_percent(assign_right), true);
+            }
+            else if (b->var_type_map[remove_percent(array_name)] == IR::TUPLE) {
+                std::string newVar = create_var_with_suffix(b);
+                std::string inst = "";
+                inst += newVar + " <- " + remove_percent(array_name) + " + " + std::to_string((std::stoi(indices[0])+1)*8) + "\n";
+                inst += "store " + newVar + " <- " + remove_percent(assign_right) + "\n";
+                return inst;
+            }
+            else {
+                cout << "Wrong var type in Right_Array_Assign_Instruction." << endl;
+            }
+        }
+
 };
 
 class Length_Assign_Instruction : public Instruction {
@@ -131,6 +301,23 @@ class Length_Assign_Instruction : public Instruction {
             std::string s("");
             s += assign_left + " <- length " + var + " " + t;
             return s;
+        }
+
+        std::string translate_to_L3(IR::BB *b) {
+            std::string v1,v2,lv,v,inst;
+            lv = remove_percent(assign_left);
+            v = remove_percent(var);
+
+            v1 = create_var_with_suffix(b);
+            v2 = create_var_with_suffix(b);
+            
+            inst = "";
+            inst += v1 + " <- " + t + " * 8\n"; 
+            inst += v1 + " += 16\n";
+            inst += v2 + " <- " + v + " + " + v1 + "\n";
+            inst += lv + " <- load " + v2 + "\n";
+
+            return inst;
         }
 };
 
@@ -161,6 +348,21 @@ class Call_Assign_Instruction : public Instruction {
             return s;
         }
 
+        std::string translate_to_L3(IR::BB *b) {
+            std::ostringstream oss;
+
+            if (!args.empty()) {
+                // Convert all but the last element to avoid a trailing ","
+                std::copy(args.begin(), args.end()-1, std::ostream_iterator<std::string>(oss, ","));
+                // Now add the last element with no delimiter
+                oss << remove_percent(args.back());
+            }
+
+            std::string s("");
+            s += remove_percent(assign_left) + " <- call " + remove_percent(callee) + " (" + remove_percent(oss.str()) + ")\n";
+            return s;
+        }
+
 };
 
 class Br1_Instruction : public Instruction {
@@ -175,6 +377,13 @@ class Br1_Instruction : public Instruction {
             s += "br " + label;
             return s;
         }
+
+        std::string translate_to_L3(IR::BB *b) {
+            std::string s("");
+            s += "br " + label + "\n";
+            return s;
+        }
+
 
 };
 
@@ -193,12 +402,22 @@ class Br2_Instruction : public Instruction {
             s += "br " + var + " " + label1 + " " + label2;
             return s;
         }
+
+        std::string translate_to_L3(IR::BB *b) {
+            std::string s("");
+            s += "br " + remove_percent(var) + " " + label1 + " " + label2 + "\n";
+            return s;
+        }
 };
 
 class Return_Instruction : public Instruction {
     public:
         std::string toString() const {
             return "return";
+        }
+
+        std::string translate_to_L3(IR::BB *b) {
+            return "return\n";
         }
 };
 
@@ -212,6 +431,12 @@ class Var_Return_Instruction : public Return_Instruction {
         std::string toString() const {
             std::string s("");
             s += "return " + var;
+            return s;
+        }
+
+        std::string translate_to_L3(IR::BB *b) {
+            std::string s("");
+            s += "return " + remove_percent(var) + "\n";
             return s;
         }
 };
@@ -229,6 +454,7 @@ class Call_Instruction : public Instruction {
             std::ostringstream oss;
 
             if (!args.empty()) {
+
                 // Convert all but the last element to avoid a trailing ","
                 std::copy(args.begin(), args.end()-1, std::ostream_iterator<std::string>(oss, ","));
                 // Now add the last element with no delimiter
@@ -238,6 +464,21 @@ class Call_Instruction : public Instruction {
             std::string s("");
             s = s + "call " + callee + " (" + oss.str() + ")";
             
+            return s;
+        }
+
+        std::string translate_to_L3(IR::BB *b) {
+            std::ostringstream oss;
+
+            if (!args.empty()) {
+                // Convert all but the last element to avoid a trailing ","
+                std::copy(args.begin(), args.end()-1, std::ostream_iterator<std::string>(oss, ","));
+                // Now add the last element with no delimiter
+                oss << remove_percent(args.back());
+            }
+
+            std::string s("");
+            s = s + "call " + remove_percent(callee) + " (" + remove_percent(oss.str()) + ")\n";
             return s;
         }
 };
@@ -251,6 +492,10 @@ class Label_Instruction : public Instruction {
 
         std::string toString() const {
             return label;
+        }
+
+        std::string translate_to_L3(IR::BB *b) {
+            return std::string(label) + "\n";
         }
 };
 
@@ -278,6 +523,54 @@ class New_Array_Assign_Instruction : public Instruction {
 
             return s;
         }
+
+        std::string translate_to_L3(IR::BB *b) {
+            int arg_num = args.size();
+
+            std::vector<std::string> pd_vec;
+            int i = 0;
+            while (i < arg_num) {
+                pd_vec.push_back(create_var_with_suffix(b));
+                i++;
+            }
+
+            std::string v0 = create_var_with_suffix(b);
+            std::string a = remove_percent(assign_left);
+
+            std::vector<std::string> p_vec;
+            for (auto arg : args) {
+                p_vec.push_back(remove_percent(arg));
+            }
+
+            std::string inst = "";
+
+            for (int i = 0; i < arg_num; i++) {
+                inst += pd_vec[i] + " <- " + p_vec[i] + " >> 1\n";
+            }
+
+            std::ostringstream oss;
+            if (!pd_vec.empty()) {
+                // Convert all but the last element to avoid a trailing ","
+                std::copy(pd_vec.begin(), pd_vec.end()-1, std::ostream_iterator<std::string>(oss, " * "));
+                // Now add the last element with no delimiter
+                oss << pd_vec.back();
+            }
+            inst += v0 + " <- " + oss.str() + "\n";
+
+            inst += v0 + " <- " + v0 + " << 1\n";
+            inst += v0 + " <- " + v0 + " + 1\n";
+            inst += v0 + " <- " + v0 + " + 6\n";
+            inst += a + " <- call allocate(" + v0 + ",1)\n";
+            inst += v0 + " <- " + a + " + 8\n";
+            inst += "store " + v0 + " <- 5\n";
+
+            for (int i = 0; i < arg_num; i++) {
+                inst += v0 + " <- " + a + " + " + std::to_string((i+2)*8) + "\n";
+                inst += "store " + v0 + " <- " + p_vec[i] + "\n";
+            }
+
+            return inst;
+        }
 };
 
 class New_Tuple_Assign_Instruction : public Instruction {
@@ -297,68 +590,48 @@ class New_Tuple_Assign_Instruction : public Instruction {
 
             return s;
         }
-};
 
-class New_Array_Instruction : public Instruction {
-    public:
-        std::vector<std::string> args;
-
-        New_Array_Instruction() {}
-        New_Array_Instruction(std::vector<std::string> a) : args(a) {}
-
-        std::string toString() const {
-            std::ostringstream oss;
-
-            if (!args.empty()) {
-                // Convert all but the last element to avoid a trailing ","
-                std::copy(args.begin(), args.end()-1, std::ostream_iterator<std::string>(oss, ","));
-                // Now add the last element with no delimiter
-                oss << args.back();
-            }
-
-            std::string s("");
-            s = s + "new Array(" + oss.str() + ")";
-
-            return s;
+        std::string translate_to_L3(IR::BB *b) {
+            return remove_percent(assign_left) + " <- call allocate(" + t + ",1)\n";
         }
 };
 
-class New_Tuple_Instruction : public Instruction {
-    public:
-        std::string t;
+// class New_Array_Instruction : public Instruction {
+//     public:
+//         std::vector<std::string> args;
 
-        New_Tuple_Instruction() {}
-        New_Tuple_Instruction(std::string t) : t(t) {}
+//         New_Array_Instruction() {}
+//         New_Array_Instruction(std::vector<std::string> a) : args(a) {}
 
-        std::string toString() const {
-            std::string s("");
-            s = s + "new Tuple(" + t + ")";
+//         std::string toString() const {
+//             std::ostringstream oss;
 
-            return s;
-        }
-};
+//             if (!args.empty()) {
+//                 // Convert all but the last element to avoid a trailing ","
+//                 std::copy(args.begin(), args.end()-1, std::ostream_iterator<std::string>(oss, ","));
+//                 // Now add the last element with no delimiter
+//                 oss << args.back();
+//             }
 
-class BB{
-    public:
-        std::string label;
-        std::vector<IR::Instruction *> instructions;
-        IR::Instruction * terminator;
-};
+//             std::string s("");
+//             s = s + "new Array(" + oss.str() + ")";
 
-class Function{
-    public:
-        std::string name;
-        std::string return_type;
-        std::vector<std::string> args;
-        std::vector<BB *> bbs;
-        std::set<std::string> labels;
-        //std::set<string> callee_registers_to_save;
-};
+//             return s;
+//         }
+// };
 
-class Program{
-    public:
-        std::string entryPointLabel;
-        std::vector<IR::Function *> functions;
-        int64_t label_suffix;
-};
+// class New_Tuple_Instruction : public Instruction {
+//     public:
+//         std::string t;
+
+//         New_Tuple_Instruction() {}
+//         New_Tuple_Instruction(std::string t) : t(t) {}
+
+//         std::string toString() const {
+//             std::string s("");
+//             s = s + "new Tuple(" + t + ")";
+
+//             return s;
+//         }
+// };
 } // IR
