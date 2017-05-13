@@ -59,49 +59,49 @@ class Instruction {
             std::string array_name, std::vector<std::string> indices,
             std::string var, bool is_left) { 
 
+            std::string inst = "";
+
             std::string A = remove_percent(array_name);
 
-            std::string k = indices[0];
-            std::string i = indices[1];
-            std::string j = indices[2];
+            int num_dim = indices.size();
 
-            std::string ADDR_M = create_var_with_suffix(b);
-            std::string M_ = create_var_with_suffix(b);
-            std::string M = create_var_with_suffix(b);
-            std::string ADDR_N = create_var_with_suffix(b);
-            std::string N_ = create_var_with_suffix(b);
-            std::string N = create_var_with_suffix(b);
-            std::string M_N = create_var_with_suffix(b);
-            // std::string M = create_var_with_suffix(b);
+            std::vector<int> dim_addrs;
+            for (int i = 1; i < num_dim; i++) {
+                dim_addrs.push_back(16+i*8);
+            }
 
-            std::string newVar1 = create_var_with_suffix(b);
-            std::string newVar2 = create_var_with_suffix(b);
-            std::string newVar3 = create_var_with_suffix(b);
+            std::string v = create_var_with_suffix(b);
+            inst += v + " <- " + remove_percent(indices.back()) + "\n";
+            indices.pop_back();
 
-            std::string index = create_var_with_suffix(b);
+            std::string M_N = "1";
+
+            for (int i = dim_addrs.size()-1; i >= 0; i--) {
+                std::string N = M_N;
+
+                std::string ADDR_M = create_var_with_suffix(b);
+                std::string M_ = create_var_with_suffix(b);
+                std::string M = create_var_with_suffix(b);
+                M_N = create_var_with_suffix(b);
+                
+                inst += ADDR_M + " <- " + A + " + " + std::to_string(dim_addrs[i]) + "\n";
+                inst += M_ + " <- load " + ADDR_M + "\n";
+                inst += M  + " <- " + M_ + " >> 1\n";
+
+                inst += M_N + " <- " + M + " * " + N + "\n";
+
+                std::string new_var = create_var_with_suffix(b);
+
+                inst += new_var + " <- " + remove_percent(indices.back()) + " * " + M_N + "\n";
+                inst += v + " <- " + v + " + " + new_var + "\n";
+                indices.pop_back();
+            }
+
             std::string offsetAfterB = create_var_with_suffix(b);
             std::string offset = create_var_with_suffix(b);
             std::string addr = create_var_with_suffix(b);
-
-            std::string inst = "";
-            
-            inst += ADDR_M + " <- " + A + " + 24\n";
-            inst += M_ + " <- load " + ADDR_M + "\n";
-            inst += M  + " <- " + M_ + " >> 1\n";
-
-            inst += ADDR_N + " <- " + A + " + 32\n";
-            inst += N_ + " <- load " + ADDR_N + "\n";
-            inst += N + " <- " + N_ + " >> 1\n";
-
-            inst += newVar1 + " <- " + i + " * " + N + "\n";
-            inst += M_N + " <- " + M + " * " + N + "\n";
-            inst += newVar2 + " <- " + k + " * " + M_N + "\n";
-            inst += newVar3 + " <- " + newVar2 + " + " + newVar1 + "\n";
-
-
-            inst += index + " <- " + newVar3 + " + " + j + "\n";
-            inst += offsetAfterB + " <- " + index + " * 8\n";
-            inst += offset + " <- " + offsetAfterB + " + 40\n";
+            inst += offsetAfterB + " <- " + v + " * 8\n";
+            inst += offset + " <- " + offsetAfterB + " + " + std::to_string(16+num_dim*8) + "\n";
             inst += addr + " <- " + A + " + " + offset + "\n";
 
             if (is_left) {
@@ -120,7 +120,6 @@ class Instruction {
             }
             return s;
         }
-        // virtual void replace_label(std::string, std::string) { return; }
 };
 
 class Type_Instruction : public Instruction {
@@ -227,11 +226,9 @@ class Right_Array_Assign_Instruction : public Instruction {
 
         std::string translate_to_L3(IR::BB *b) {
             if (b->var_type_map[remove_percent(array_name)] == IR::INT64) {
-                cout << "666666" << endl;
                 return translate_array_assign(b, array_name, indices, remove_percent(assign_left), false);
             }
             else if (b->var_type_map[remove_percent(array_name)] == IR::TUPLE) {
-                cout << "777777" << endl;
                 std::string newVar = create_var_with_suffix(b);
                 std::string inst = "";
                 inst += newVar + " <- " + remove_percent(array_name) + " + " + std::to_string((std::stoi(indices[0])+1)*8) + "\n";
