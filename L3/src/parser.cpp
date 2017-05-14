@@ -158,6 +158,8 @@ namespace L3 {
 
   struct br_var : var {};
 
+  struct return_t : t {};
+
   struct op:
     pegtl::sor<
       pegtl_string_t("<<"),
@@ -287,14 +289,14 @@ namespace L3 {
       seps,
       pegtl_string_t("return"),
       seps,
-      opd,
+      return_t,
       seps
     > {};
 
   struct call_instruction :
     pegtl::seq<
       seps,
-      pegtl_string_t("call"),
+      pegtl_string_t("call "),
       seps,
       opd,
       seps,
@@ -313,7 +315,7 @@ namespace L3 {
       seps,
       pegtl_string_t("<-"),
       seps,
-      pegtl_string_t("call"),
+      pegtl_string_t("call "),
       seps,
       opd,
       seps,
@@ -775,6 +777,24 @@ namespace L3 {
     }
   };
 
+  template<> struct action < return_t > {
+    static void apply( const pegtl::input & in, L3::Program & p){
+      cout << "return_t: ";
+      cout << in.string() << endl;
+
+      L3::Function *currentF = p.functions.back();
+
+      std::string o = in.string();
+      o.erase(remove(o.begin(), o.end(), '\n'), o.end());
+      o.erase(remove(o.begin(), o.end(), ' '), o.end());
+
+      if (!o.empty() && o.at(0) == ':') {
+        currentF->labels.insert(o);
+      }
+
+      items.push_back(o);
+    }
+  };
   // template<> struct action < L3_instruction_rule > {
   //   static void apply( const pegtl::input & in, L3::Program & p){
   //     cout << in.string() << endl;

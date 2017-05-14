@@ -29,8 +29,10 @@ std::map<std::string, int> function_invokeNum;
 
 bool label_exist(std::vector<L3::Function *> functions, int i, std::string l) {
   for (int j = 0; j < functions.size(); j++) {
-    if (functions[i]->labels.find(l) != functions[i]->labels.end()) {
-      return true;
+    if (i != j) {
+      if (functions[i]->labels.find(l) != functions[i]->labels.end()) {
+        return true;
+      }
     }
   }
   return false;
@@ -128,7 +130,11 @@ bool replace_node(L3::Node * node, L3::Node * var, L3::Node * alter_var) {
   for (int i = 0; i < node->children.size(); i++) {
     if (node->children[i]) {
       if (node->children[i]->item == var->item) {
+        // cout << "hererererere" << endl;
+        alter_var->val = var->item;
         node->children[i] = alter_var;
+        // alter_var->printNode();
+        // cout << endl;
         success = true;
       }
       else if(replace_node(node->children[i], var, alter_var)) {
@@ -141,10 +147,13 @@ bool replace_node(L3::Node * node, L3::Node * var, L3::Node * alter_var) {
 }
 
 bool merge_tree(L3::Tree * t, L3::Tree * merged_tree) {
+  // t->printTree();
+  // merged_tree->printTree();
   if (!t->root || t->root->item != "<-") {
     return false;
   }
   if (t->root->children[1]->item == "call") {
+    // cout << "111111111111" << endl;
     return false;
   }
 
@@ -154,12 +163,16 @@ bool merge_tree(L3::Tree * t, L3::Tree * merged_tree) {
   if ((merged_tree->root->item == "return" 
     || merged_tree->root->item == "call" 
     || merged_tree->root->item == "br") && (alter_var->ittp >= L3::ASGN)) {
+    // cout << "00000000000000" << endl;
       return false;
   }
 
   if ((merged_tree->root->item == "<-" 
     && merged_tree->root->children[1]->item == "call")
      && (alter_var->ittp >= L3::ASGN)) {
+    // cout << "00000000000000" << endl;
+    // alter_var->printNode();
+    // cout << endl;
       return false;
   }
 
@@ -603,7 +616,7 @@ std::vector<L3::Tree *> generate_L2_tiles() {
   return tiles;
 }
 
-bool match_call_node(L3::Node * node, L3::Node * pattern, L3::Tree * rest_tree) {
+bool match_call_node(L3::Node * node, L3::Node * pattern, std::vector<L3::Tree *> & rest_trees) {
   if (pattern->item != "call") return false;
 
   pattern->ittp = node->ittp;
@@ -618,7 +631,7 @@ bool match_call_node(L3::Node * node, L3::Node * pattern, L3::Tree * rest_tree) 
   return true;
 }
 
-bool match_load_store_node(L3::Node * node, L3::Node * pattern, L3::Tree * rest_tree) {
+bool match_load_store_node(L3::Node * node, L3::Node * pattern, std::vector<L3::Tree *> & rest_trees) {
 
   if (pattern->item != "load" && pattern->item != "store") return false;
   if (pattern->item != node->item) return false;
@@ -628,14 +641,96 @@ bool match_load_store_node(L3::Node * node, L3::Node * pattern, L3::Tree * rest_
   pattern->val = node->val;
   pattern->val_ittp = node->val_ittp;
 
-  for (auto ch : node->children) {
-    pattern->children.push_back(ch);
+  // for (auto ch : node->children) {
+  //   pattern->children.push_back(ch);
+  // }
+
+  // analyse load_store pattern
+  if (node->children[0]->item != "+") { 
+    // load
+    //   |
+    //   x
+    pattern->children.push_back(node->children[0]);
+    return true;
+  }
+  else {
+    if (node->children[0]->children[0]->ittp < L3::ASGN && node->children[0]->children[1]->ittp < L3::ASGN) {
+      pattern->children.push_back(node->children[0]);
+      return true;
+    }
+    if (node->children[0]->children[0]->ittp >= L3::ASGN && node->children[0]->children[1]->ittp < L3::ASGN) {
+      // load
+      //   |
+      //   +
+      //  / \
+      // op  x
+      std::string assign_left = node->children[0]->children[0]->val;
+      std::string assign_right = node->children[0]->children[1]->item;
+      L3::Node * n = new L3::Node("+",L3::PLUS);
+      n->val = node->children[0]->val;
+      n->children.push_back(new L3::Node(assign_left,node->children[0]->children[0]->second_ittp));
+      n->children.push_back(new L3::Node(assign_right,node->children[0]->children[1]->ittp));
+
+      pattern->children.push_back(n);
+      
+      L3::Tree * rest_tree = new L3::Tree();
+      rest_tree->root = node->children[0]->children[0];
+      rest_trees.push_back(rest_tree);
+
+      return true;
+    }
+    if (node->children[0]->children[0]->ittp < L3::ASGN && node->children[0]->children[1]->ittp >= L3::ASGN) {
+      // cout << "should see here" << endl;
+      // load
+      //   |
+      //   +
+      //  / \
+      // x  op
+      std::string assign_left = node->children[0]->children[0]->item;
+      std::string assign_right = node->children[0]->children[1]->val;
+      L3::Node * n = new L3::Node("+",L3::PLUS);
+      n->val = node->children[0]->val;
+      n->children.push_back(new L3::Node(assign_left,node->children[0]->children[0]->ittp));
+      n->children.push_back(new L3::Node(assign_right,node->children[0]->children[1]->second_ittp));
+
+      pattern->children.push_back(n);
+      
+      L3::Tree * rest_tree = new L3::Tree();
+      rest_tree->root = node->children[0]->children[1];
+      rest_trees.push_back(rest_tree);
+
+      // rest_tree->printTree();
+
+      return true;
+    }
+    // load
+    //   |
+    //   +
+    //  / \
+    // op  op
+    std::string assign_left = node->children[0]->children[0]->val;
+    std::string assign_right = node->children[0]->children[1]->val;
+    L3::Node * n = new L3::Node("+",L3::PLUS);
+    n->children.push_back(new L3::Node(assign_left,node->children[0]->children[0]->second_ittp));
+    n->children.push_back(new L3::Node(assign_right,node->children[0]->children[1]->second_ittp));
+
+    pattern->children.push_back(n);
+    
+    L3::Tree * rest_tree1 = new L3::Tree();
+    rest_tree1->root = node->children[0]->children[0];
+    rest_trees.push_back(rest_tree1);
+
+    L3::Tree * rest_tree2 = new L3::Tree();
+    rest_tree2->root = node->children[0]->children[1];
+    rest_trees.push_back(rest_tree2);
+
+    return true;
   }
 
   return true;
 }
 
-bool match_node(L3::Node * node, L3::Node * pattern, L3::Tree * rest_tree) {
+bool match_node(L3::Node * node, L3::Node * pattern, std::vector<L3::Tree *> & rest_trees) {
   if (!pattern) {
     return true;
   }
@@ -649,7 +744,9 @@ bool match_node(L3::Node * node, L3::Node * pattern, L3::Tree * rest_tree) {
 
   if (pattern->children.empty()) {
     if (!node->children.empty()) {
+      L3::Tree * rest_tree = new L3::Tree();
       rest_tree->root = node;
+      rest_trees.push_back(rest_tree);
     }
     return true;
   }
@@ -659,7 +756,7 @@ bool match_node(L3::Node * node, L3::Node * pattern, L3::Tree * rest_tree) {
   }
 
   for (int i = 0; i < node->children.size(); i++) {
-    if (!match_node(node->children[i], pattern->children[i], rest_tree)) {
+    if (!match_node(node->children[i], pattern->children[i], rest_trees)) {
       return false;
     }
   }
@@ -672,19 +769,24 @@ void tiling(L3::Node * L3_tree, vector<L3::Tree *> L2_tiles, vector<L3::Tree *> 
   if (!L3_tree) return;
 
   for (auto tile : L2_tiles) {
-    L3::Tree * rest_tree = new L3::Tree();
+    std::vector<L3::Tree *> rest_trees;// = new L3::Tree();
     L3::Tree * tile_copy = generate_L2_tile_by_type(tile->tile_type);
-    if (L3_tree->item == "call" && match_call_node(L3_tree, tile_copy->root, rest_tree)) {
+    if (L3_tree->item == "call" && match_call_node(L3_tree, tile_copy->root, rest_trees)) {
       tiles.push_back(tile_copy);
       return;
     }
-    else if ((L3_tree->item == "load" || L3_tree->item == "store") && match_load_store_node(L3_tree, tile_copy->root, rest_tree)) {
+    else if ((L3_tree->item == "load" || L3_tree->item == "store") && match_load_store_node(L3_tree, tile_copy->root, rest_trees)) {
       tiles.push_back(tile_copy);
+      for (auto rest_tree : rest_trees) {
+        tiling(rest_tree->root, L2_tiles, tiles);
+      }
       return;
     }
-    else if (match_node(L3_tree, tile_copy->root, rest_tree)) {
+    else if (match_node(L3_tree, tile_copy->root, rest_trees)) {
       tiles.push_back(tile_copy);
-      tiling(rest_tree->root, L2_tiles, tiles);
+      for (auto rest_tree : rest_trees) {
+        tiling(rest_tree->root, L2_tiles, tiles);
+      }
       return;
     }
   }
@@ -769,7 +871,7 @@ std::string write_L2_gen_left_mem_assign_tree(L3::Tree * t) {
 }
 
 std::string write_L2_gen_right_mem_assign_tree(L3::Tree * t) {
-  std::string var, x, M, inst;
+  std::string var, x, M, op_var,inst;
 
   var = t->root->val;
   if (t->root->children[0]->item != "+") {
@@ -779,6 +881,9 @@ std::string write_L2_gen_right_mem_assign_tree(L3::Tree * t) {
   else {
     x = t->root->children[0]->children[0]->item;
     M = t->root->children[0]->children[1]->item;
+    op_var = t->root->children[0]->val;
+    // cout << "HHHHHHHHHHHHHHHHH" << endl;
+    // t->printTree();
   }
 
   if (isStrDigit(x)) {
@@ -787,8 +892,10 @@ std::string write_L2_gen_right_mem_assign_tree(L3::Tree * t) {
 
   inst = "";
   if (!isStrDigit(M)) {
-    inst += "(" + x + " += " + M + ")\n";
-    inst += "(" + var + " <- (mem " + x + " 0))\n";
+
+    inst += "(" + op_var + " <- " + x + ")\n";
+    inst += "(" + op_var + " += " + M + ")\n"; 
+    inst += "(" + var + " <- (mem " + op_var + " 0))\n";
   }
   else {
     inst += "(" + var + " <- (mem " + x + " " + M + "))\n";
@@ -1008,9 +1115,15 @@ std::string write_L2_gen_call_tree(L3::Tree * t) {
     function_invokeNum[callee]++;
   }
 
-  if (callee.at(0) == ':') {
-    inst += "((mem rsp -8) <- " + 
-      callee + "_ret" + std::to_string(function_invokeNum[callee]) + ")\n";
+  if (callee != "print" && callee != "allocate" && callee != "array-error") {
+    if (callee.at(0) != ':') {
+      inst += "((mem rsp -8) <- :" +
+        callee + "_ret" + std::to_string(function_invokeNum[callee]) + ")\n";
+    }
+    else {
+      inst += "((mem rsp -8) <- " + 
+        callee + "_ret" + std::to_string(function_invokeNum[callee]) + ")\n";
+    }
   }
 
   if (args_vec.size() > 6) {
@@ -1022,8 +1135,13 @@ std::string write_L2_gen_call_tree(L3::Tree * t) {
   }
   inst += "(call " + callee + " " + std::to_string(args_vec.size()) + ")\n";
   
-  if (callee.at(0) == ':') {
-    inst += callee + "_ret" + std::to_string(function_invokeNum[callee]) + "\n";
+  if (callee != "print" && callee != "allocate" && callee != "array-error") {
+    if (callee.at(0) != ':') {
+      inst += std::string(":") + callee + "_ret" + std::to_string(function_invokeNum[callee]) + "\n";
+    }
+    else {
+      inst += callee + "_ret" + std::to_string(function_invokeNum[callee]) + "\n";
+    }
   }
 
   return inst;
