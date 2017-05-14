@@ -979,9 +979,9 @@ void spill(L2::Function *f, string v) {
 
       replace_writes_to_v(f, new_instructions, i, v, s_var, stack_loc);
       // cout << (*it)->opt << endl;
-      if (instr->opt != "<-" || !instr->mem_opt.empty() || instr->cmp_opt.empty()) {
-        replace_old_instruction(f, new_instructions, i, v, s_var, stack_loc);
-      }
+      // if (instr->opt != "<-" || instr->mem_opt.empty() || instr->cmp_opt.empty()) {
+      replace_old_instruction(f, new_instructions, i, v, s_var, stack_loc);
+      // }
       replace_reads_from_v(f, new_instructions, i, v, s_var, stack_loc);
 
       suffix++;
