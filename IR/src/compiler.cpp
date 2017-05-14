@@ -86,25 +86,47 @@ int main(
     cout << endl;
   }
 
+  std::string program_str = "";
   cout << "After translating:" << endl;
   for (auto f : p.functions) {
+    f->declare_var();
+    
     cout << f->return_type << " ";
     cout << f->name;
+    program_str += "define " + f->name + "(";
     
-    for (auto arg : f->args) {
-      cout << " " << remove_percent(arg);
+    for (int i = 0; i < f->args.size(); i++) {
+      cout << " " << remove_percent(f->args[i]);
+      if (i == 1) {
+        program_str += remove_percent(f->args[i]);
+      }
+      else if (i % 2 == 1) {
+        program_str += ", " + remove_percent(f->args[i]);
+      }
     }
+    program_str += ") {\n";
+    
     cout << endl;
     for (auto bb : f->bbs) {
       cout << bb->label << endl;
+      program_str += bb->label + "\n";
       int n = 1;
       for (auto i : bb->instructions) {
         cout << n++ << ": ";
         cout << i->translate_to_L3(bb);
+        program_str += i->translate_to_L3(bb);
       }
       cout << bb->terminator->translate_to_L3(bb);
+      program_str += bb->terminator->translate_to_L3(bb);
     }
+    program_str += "}\n";
     cout << endl;
   }
+
+  ofstream out;
+  out.open("prog.L3", ios::out);
+  out << program_str;
+  out.close();
+
   return 0;
 }

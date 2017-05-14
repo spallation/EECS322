@@ -22,6 +22,7 @@ class BB{
 
         std::map<std::string, VAR_TYPE> var_type_map;
         std::set<std::string> var_set;
+        std::set<std::string> temp_var_set;
         int64_t var_suffix;
 };
 
@@ -32,7 +33,33 @@ class Function{
         std::vector<std::string> args;
         std::vector<BB *> bbs;
         std::set<std::string> labels;
-        //std::set<string> callee_registers_to_save;
+
+        std::string remove_percent(std::string s) {
+        if (!s.empty() && s.at(0) == '%') {
+            s = s.substr(1);
+        }
+            return s;
+        }
+
+        void declare_var() {
+            for (auto b : bbs) {
+                for (int i = 0; i < args.size(); i++) {
+                    std::string type = args[i];
+                    std::string v = remove_percent(args[++i]);
+                    if (type == "tuple") {
+                        b->var_type_map[v] = IR::TUPLE;
+                    }
+                    else if (type == "code") {
+                        b->var_type_map[v] = IR::CODE;
+                    }
+                    else {
+                        b->var_type_map[v] = IR::INT64;
+                    }
+                    b->temp_var_set.insert(v);
+                }
+            }
+        }
+    //std::set<string> callee_registers_to_save;
 };
 
 class Program{
@@ -49,11 +76,15 @@ class Instruction {
         
         std::string create_var_with_suffix(IR::BB *b) {
             std::string v = "tv" + std::to_string(b->var_suffix++);
-            while (b->var_set.find(v) != b->var_set.end()) {
+            while (b->var_set.find(v) != b->var_set.end() || b->temp_var_set.find(v) != b->temp_var_set.end()) {
                 v = "tv" + std::to_string(b->var_suffix++);
             }
-            b->var_set.insert(v);
+            b->temp_var_set.insert(v);
             return v;
+        }
+        void clear_temp_var_set(IR::BB *b) {
+            b->temp_var_set.clear();
+            b->var_suffix = 0;
         }
         std::string translate_array_assign(IR::BB *b, 
             std::string array_name, std::vector<std::string> indices,
@@ -88,7 +119,9 @@ class Instruction {
                 inst += M_ + " <- load " + ADDR_M + "\n";
                 inst += M  + " <- " + M_ + " >> 1\n";
 
-                inst += M_N + " <- " + M + " * " + N + "\n";
+                std::string N_var = create_var_with_suffix(b);
+                inst += N_var + " <- " + N + "\n";
+                inst += M_N + " <- " + M + " * " + N_var + "\n";
 
                 std::string new_var = create_var_with_suffix(b);
 
@@ -111,6 +144,7 @@ class Instruction {
                 inst += var + " <- load " + addr + "\n";
             }
 
+            clear_temp_var_set(b);
             return inst;
         }
 
@@ -233,10 +267,12 @@ class Right_Array_Assign_Instruction : public Instruction {
                 std::string inst = "";
                 inst += newVar + " <- " + remove_percent(array_name) + " + " + std::to_string((std::stoi(indices[0])+1)*8) + "\n";
                 inst += remove_percent(assign_left) + " <- load " + newVar + "\n";
+                clear_temp_var_set(b);
                 return inst;
             }
             else {
                 cout << "Wrong var type in Right_Array_Assign_Instruction." << endl;
+                return "";
             }
         }
 
@@ -276,10 +312,12 @@ class Left_Array_Assign_Instruction : public Instruction {
                 std::string inst = "";
                 inst += newVar + " <- " + remove_percent(array_name) + " + " + std::to_string((std::stoi(indices[0])+1)*8) + "\n";
                 inst += "store " + newVar + " <- " + remove_percent(assign_right) + "\n";
+                clear_temp_var_set(b);
                 return inst;
             }
             else {
                 cout << "Wrong var type in Right_Array_Assign_Instruction." << endl;
+                return "";
             }
         }
 
@@ -310,10 +348,11 @@ class Length_Assign_Instruction : public Instruction {
             
             inst = "";
             inst += v1 + " <- " + t + " * 8\n"; 
-            inst += v1 + " += 16\n";
+            inst += v1 + " <- " + v1 + " + " + "16\n";
             inst += v2 + " <- " + v + " + " + v1 + "\n";
             inst += lv + " <- load " + v2 + "\n";
 
+            clear_temp_var_set(b);
             return inst;
         }
 };
@@ -545,27 +584,34 @@ class New_Array_Assign_Instruction : public Instruction {
                 inst += pd_vec[i] + " <- " + p_vec[i] + " >> 1\n";
             }
 
-            std::ostringstream oss;
+            // std::ostringstream oss;
+            // if (!pd_vec.empty()) {
+            //     // Convert all but the last element to avoid a trailing ","
+            //     std::copy(pd_vec.begin(), pd_vec.end()-1, std::ostream_iterator<std::string>(oss, " * "));
+            //     // Now add the last element with no delimiter
+            //     oss << pd_vec.back();
+            // }
             if (!pd_vec.empty()) {
-                // Convert all but the last element to avoid a trailing ","
-                std::copy(pd_vec.begin(), pd_vec.end()-1, std::ostream_iterator<std::string>(oss, " * "));
-                // Now add the last element with no delimiter
-                oss << pd_vec.back();
+                inst += v0 + " <- " + pd_vec[0] + "\n";
+                for (int i = 1; i < pd_vec.size(); i++) {
+                    inst += v0 + " <- " + v0 + " * " + pd_vec[i] + "\n";
+                }
             }
-            inst += v0 + " <- " + oss.str() + "\n";
 
             inst += v0 + " <- " + v0 + " << 1\n";
-            inst += v0 + " <- " + v0 + " + 1\n";
-            inst += v0 + " <- " + v0 + " + 6\n";
+            // inst += v0 + " <- " + v0 + " + 1\n";
+            inst += v0 + " <- " + v0 + " + " + std::to_string(2*(1+arg_num)+1) + "\n";
             inst += a + " <- call allocate(" + v0 + ",1)\n";
             inst += v0 + " <- " + a + " + 8\n";
-            inst += "store " + v0 + " <- 5\n";
+            inst += "store " + v0 + " <- " + std::to_string(2*arg_num+1) + "\n";
 
             for (int i = 0; i < arg_num; i++) {
                 inst += v0 + " <- " + a + " + " + std::to_string((i+2)*8) + "\n";
                 inst += "store " + v0 + " <- " + p_vec[i] + "\n";
             }
 
+            clear_temp_var_set(b);
+            
             return inst;
         }
 };
