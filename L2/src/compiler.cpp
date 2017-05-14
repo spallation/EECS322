@@ -121,6 +121,7 @@ void print_result(std::vector<std::vector<std::string> > IN, std::vector<std::ve
 }
 
 bool myisdigit(std::string s) {
+  // cout << s << endl;
   if (s.at(0) == '+' || s.at(0) == '-') {
     return isdigit(s.at(1));
   }
@@ -205,6 +206,7 @@ std::vector<int> get_successor(int i, L2::Function *f) {
 void get_GEN_KILL(L2::Instruction *i) {
 
   std::string opt = i->opt;
+  // cout << opt << endl;
   // cout << j << " " << i->opt << endl;
   
   // get GEN and KILL
@@ -252,6 +254,8 @@ void get_GEN_KILL(L2::Instruction *i) {
     std::string call_function_name = i->operands.front();
     // cout << "---------------------------------------" << endl;
     // cout << i->instr_string << ": ";
+    // cout << i->operands.back() << endl;
+    // cout << "wtfffffff" << endl;
     // cout << i->operands.back() << endl;
     int N = std::stoi(i->operands.back());
 
@@ -326,6 +330,9 @@ void get_GEN_KILL(L2::Instruction *i) {
   }
   // sop instrction
   else if (opt == "<<=" || opt == ">>=") {
+    // for (auto x : i->operands) {
+    //   cout << x << endl;
+    // }
     my_insert(i->operands[0], i->KILL);
     my_insert(i->operands[0], i->GEN);
     my_insert(i->operands[1], i->GEN);
@@ -344,9 +351,11 @@ void liveness(L2::Function *f,
 
   int j = 0; // instruction index
   for (auto i : f->instructions) {
+    i->GEN.clear();
+    i->KILL.clear();
     get_GEN_KILL(i);
   }
-  
+  // cout << "wtf1" << endl;
   // print_GEN_KILL(GEN,KILL);
 
   // initialize IN and OUT
@@ -526,22 +535,76 @@ std::string find_var_with_least_edge(Graph *g) {
   return least_edge_node_name;
 }
 
+std::string find_var_with_most_edge_less_than15(Graph *g) {
+  // cout << "find_var_with_most_edge ";
+  int max_edge = INT_MIN;
+  std::string most_edge_node_name = "";
+  // if (g->node_map.empty()) {
+  //   cout << ".........." << endl;
+  // }
+  for (auto p : g->node_map) {
+    // cout << p.first << " ";
+    // if (p.second) {
+    //   cout << p.second->num_edge << endl;
+    // }
+    // else {
+    //   cout << "wierd" << endl;
+    // }
+    if (isGPRegister(p.first)) {
+      continue;
+    }
+    if (p.second->num_edge > max_edge && p.second->num_edge < 15) {
+      max_edge = p.second->num_edge;
+      most_edge_node_name = p.first;
+    }
+  }
+  // cout << most_edge_node_name << endl;
+  return most_edge_node_name;
+}
+
+std::string find_var_with_most_edge(Graph *g) {
+  // cout << "find_var_with_most_edge: ";
+  int max_edge = INT_MIN;
+  std::string most_edge_node_name = "";
+  for (auto p : g->node_map) {
+    if (isGPRegister(p.first)) {
+      continue;
+    }
+    if (p.second->num_edge > max_edge) {
+      max_edge = p.second->num_edge;
+      most_edge_node_name = p.first;
+    }
+  }
+  return most_edge_node_name;
+}
+
 void delete_edge(Graph* g, std::string node_name) {
+  // cout << "deleting edge for node: " << node_name << endl;
   for (auto p1 : g->node_map) {
     Node* curNode = p1.second;
     if (p1.first == node_name) {
       for (auto p2 : curNode->next_map) {
-        curNode->next_map[p2.first] = NULL;
-        curNode->num_edge--;
+        if (curNode->next_map[p2.first]) {
+          curNode->next_map[p2.first] = NULL;
+          // cout << "delete edge with " << p2.first << endl;
+          // cout << curNode->num_edge << endl;
+          curNode->num_edge--;
+          // cout << curNode->num_edge << endl;
+        }
       }
     }
     else {
-      if (curNode->next_map.find(p1.first) != curNode->next_map.end()) {
-        curNode->next_map[p1.first] = NULL;
+      if (curNode->next_map.find(node_name) != curNode->next_map.end()
+        && curNode->next_map[node_name]) {
+        curNode->next_map[node_name] = NULL;
+        // cout << "delete" << curNode->var << "'s edge with " << node_name << endl;
+        // cout << curNode->num_edge << endl;
         curNode->num_edge--;
+        // cout << curNode->num_edge << endl;
       }
     }
   }
+  // cout << "delete complete" << endl;
 }
 
 void recover_edges(Graph *g, Node* curNode) {
@@ -656,7 +719,7 @@ struct Graph * gen_inference_graph(L2::Function *f, std::vector<std::vector<std:
   return g;
 }
 
-struct Graph * gen_coloring_graph(Graph * g, std::stack<string> &spill_stack) {
+void gen_coloring_graph(Graph * g, std::stack<string> &spill_stack) {
   // std::vector<string> vec;
   // g->sorted_array = std::vector<pair<std::string, struct Node*> > (g->node_map.begin(), g->node_map.end());
   
@@ -664,7 +727,7 @@ struct Graph * gen_coloring_graph(Graph * g, std::stack<string> &spill_stack) {
   // cout << "graph has " << g->num_var << " vars" << endl;
   // cout << g->num_no_color_var << " vars have no color." << endl;
 
-  std::stack<Node*> var_stack;
+  std::stack<Node*> reverse_var_stack;
   // vector<string> color_list (H1_sorted_color.begin(), H1_sorted_color.end());
   vector<string> color_list (H1_sorted_color.begin(), H1_sorted_color.end());
   // cout << color_list[0] << endl;
@@ -673,14 +736,26 @@ struct Graph * gen_coloring_graph(Graph * g, std::stack<string> &spill_stack) {
   // until graph is empty
   while (g->num_var > 0) {
   // while(!g->node_map.empty()) {
-    std::string start_node_name = find_var_with_least_edge(g);
+    // print_graph(g);
+    std::string start_node_name = find_var_with_most_edge_less_than15(g);
+    if (start_node_name == "") {
+      start_node_name = find_var_with_most_edge(g);
+    }
     Node* curNode = g->node_map[start_node_name];
     
+    // cout << curNode->var << " " << curNode->num_edge << endl;
+
     delete_edge(g, start_node_name);
     g->node_map.erase(start_node_name);
-    
-    var_stack.push(curNode);
+  
+    reverse_var_stack.push(curNode);
     g->num_var--;
+  }
+
+  std::stack<Node*> var_stack;
+  while (!reverse_var_stack.empty()) {
+    var_stack.push(reverse_var_stack.top());
+    reverse_var_stack.pop();
   }
 
   // rebuild graph and assign color
@@ -709,7 +784,9 @@ void coloring(L2::Function *f, Graph *g) {
       // cout << "coloring " << opd << " ";
       if (g->node_map.find(opd) != g->node_map.end()) {
         // cout << g->node_map[opd]->color;
-        i->operands[k] = g->node_map[opd]->color;
+        if (!g->node_map[opd]->color.empty()) {
+          i->operands[k] = g->node_map[opd]->color;
+        }
       }
       // cout << endl;
     }
@@ -728,22 +805,26 @@ int count_var_in_set(string v, std::set<std::string> const seti) {
 
 void replace_old_instruction(L2::Function *f,
                              std::vector<L2::Instruction *> & new_instructions,
-                            int i, string v, int stack_loc) {
-
+                            int i, string v, string s_var, int stack_loc) {
+  cout << "replace_old_instruction" << endl;
   // string s_var = "S" + to_string(stack_loc/8);
-  int suffix = 0;
-  string s_var = convert_to_suffix(suffix) + to_string(stack_loc/8);
-  while (var_exists_in_function(s_var,f)) {
-    s_var = convert_to_suffix(++suffix) + to_string(stack_loc/8);
-  }
-  cout << s_var << endl;
+  
   // cout << f->instructions[i]->opt << "(";
-  for (vector<string>::iterator it = f->instructions[i]->operands.begin(); it < f->instructions[i]->operands.end(); it++) {
-    // cout << *it;
-    if ((*it) == v) {
-      (*it) = s_var;
+  // for (vector<string>::iterator it = f->instructions[i]->operands.begin(); it < f->instructions[i]->operands.end(); it++) {
+  //   // cout << *it;
+  //   if ((*it) == v) {
+  //     (*it) = s_var;
+  //   }
+  // }
+  // cout << f->instructions[i]->instr_string << endl;
+  print_instruction(f->instructions[i]);
+
+  for (int j = 0; j < f->instructions[i]->operands.size(); j++) {
+    if (f->instructions[i]->operands[j] == v) {
+      f->instructions[i]->operands[j] = s_var;
     }
   }
+  // print_instruction(f->instructions[i]);
 
   L2::Instruction *curI = f->instructions[i];
 
@@ -757,6 +838,7 @@ void replace_old_instruction(L2::Function *f,
   // newI->instr_string = curI->instr_string;
 
   new_instructions.push_back(newI);
+  print_instruction(newI);
   // cout << endl;
   // for (auto opd : f->instructions[i]->operands) {
   //   cout << opd << " ";
@@ -766,17 +848,26 @@ void replace_old_instruction(L2::Function *f,
 
 void replace_writes_to_v(L2::Function *f, 
                          std::vector<L2::Instruction *> & new_instructions,
-                         int i, string v, int stack_loc) {
+                         int i, string v, string s_var, int stack_loc) {
+  int num_of_writes_to_v = count_var_in_set(v,f->instructions[i]->GEN);
+  if (num_of_writes_to_v == 0) {
+    return;
+  }
+
+  cout << "replace_writes_to_v" << endl;
   // int num_of_writes_to_v = get_writes_idx(*it, v);
   // string s_var = "S" + to_string(stack_loc/8);
-  int suffix = 0;
-  string s_var = convert_to_suffix(suffix) + to_string(stack_loc/8);
-  while (var_exists_in_function(s_var,f)) {
-    s_var = convert_to_suffix(++suffix) + to_string(stack_loc/8);
-  }
-  cout << s_var << endl;
+  // int suffix = 1;
+  // string s_var = convert_to_suffix(suffix) + to_string(stack_loc/8);
+  // while (var_exists_in_function(s_var,f)) {
+  //   s_var = convert_to_suffix(++suffix) + to_string(stack_loc/8);
+  // }
+  // cout << s_var << endl;
 
-  int num_of_writes_to_v = count_var_in_set(v,f->instructions[i]->GEN);
+  // if (num_of_writes_to_v == 0) {
+  //   new_instructions.push_back(f->instructions[i]);
+  //   return;
+  // }
   // cout << num_of_writes_to_v << endl;
 
   for (int k = 0; k < num_of_writes_to_v; k++) {
@@ -790,6 +881,7 @@ void replace_writes_to_v(L2::Function *f,
     // newI->instr_string = s_var + " <- (mem rsp " + to_string(stack_loc) + ")";
 
     new_instructions.push_back(newI);
+    print_instruction(newI);
     // cout << newI->opt << endl;
     // f->instructions.insert(f->instructions.begin()+i, newI);
     // cout << f->instructions[i-k]->instr_string << endl;
@@ -801,18 +893,19 @@ void replace_writes_to_v(L2::Function *f,
 
 void replace_reads_from_v(L2::Function *f, 
                           std::vector<L2::Instruction *> & new_instructions,
-                          int i, string v, int stack_loc) {
+                          int i, string v, string s_var, int stack_loc) {
   if (f->instructions[i]->KILL.find(v) == f->instructions[i]->KILL.end()) {
+    // new_instructions.push_back(f->instructions[i]);
     return;
   }
-  // cout << "replace_reads_from_v" << endl;
+  cout << "replace_reads_from_v" << endl;
   // string s_var = "S" + to_string(stack_loc/8);
-  int suffix = 0;
-  string s_var = convert_to_suffix(suffix) + to_string(stack_loc/8);
-  while (var_exists_in_function(s_var,f)) {
-    s_var = convert_to_suffix(++suffix) + to_string(stack_loc/8);
-  }
-  cout << s_var << endl;
+  // int suffix = 1;
+  // string s_var = convert_to_suffix(suffix) + to_string(stack_loc/8);
+  // while (var_exists_in_function(s_var,f)) {
+  //   s_var = convert_to_suffix(++suffix) + to_string(stack_loc/8);
+  // }
+  // cout << s_var << endl;
   
   L2::Instruction *newI = new L2::Instruction();
   // newI->instr_string = "(mem rsp 0) <-";
@@ -821,7 +914,17 @@ void replace_reads_from_v(L2::Function *f,
   newI->is_right_mem = false;
   newI->operands.push_back("rsp");
   newI->operands.push_back(to_string(stack_loc));
-  newI->operands.push_back(s_var);
+  if (!(f->instructions[i]->mem_opt.empty()) || !(f->instructions[i]->cmp_opt.empty())) {
+    cout << "check replace_reads_from_v" << endl;
+  }
+  
+  if (f->instructions[i]->opt == "<-") {
+    newI->operands.push_back(f->instructions[i]->operands.back());
+  }
+  else {
+    newI->operands.push_back(s_var);
+  }
+  
 
   // for (auto opd : newI->operands) {
   //   cout << opd << " ";
@@ -834,13 +937,26 @@ void replace_reads_from_v(L2::Function *f,
   // cout << newI->instr_string << endl;
   // f->instructions.insert(f->instructions.begin()+i+1, newI);
   new_instructions.push_back(newI);
+  print_instruction(newI);
 
   // cout << new->instr_string << endl;
+}
+
+bool instruction_need_spill(L2::Instruction * i, string v) {
+  int num_of_writes_to_v = count_var_in_set(v,i->GEN);
+  if (num_of_writes_to_v == 0 && i->KILL.find(v) == i->KILL.end()) {
+    return false;
+  }
+  return true;
 }
 
 void spill(L2::Function *f, string v) {
   cout << "spill " << v << endl;
 
+  // print_function(f);
+
+  int stack_loc = (f->locals++) * 8;
+  int suffix = 0;
   std::vector<L2::Instruction *> new_instructions;
   // for (vector<L2::Instruction*>::iterator it = f->instructions.begin(); it < f->instructions.end(); it++) {
   for (int i = 0; i < f->instructions.size(); i++) {
@@ -849,14 +965,30 @@ void spill(L2::Function *f, string v) {
     // }
     L2::Instruction *instr = f->instructions[i];
     // cout << f->instructions[i]->instr_string << endl;
-    int stack_loc = (f->locals++) * 8;
     
-    replace_writes_to_v(f, new_instructions, i, v, stack_loc);
-    // cout << (*it)->opt << endl;
-    if (instr->opt != "<-") {
-      replace_old_instruction(f, new_instructions, i, v, stack_loc);
+    if (instruction_need_spill(instr, v)) {
+      // cout << instr->instr_string << endl;
+      print_instruction(instr);
+      
+      int gen_var_suffix = 1;
+      string s_var = convert_to_suffix(gen_var_suffix) + to_string(suffix);
+      while (var_exists_in_function(s_var,f)) {
+        s_var = convert_to_suffix(++gen_var_suffix) + to_string(suffix);
+      }
+      cout << s_var << endl;
+
+      replace_writes_to_v(f, new_instructions, i, v, s_var, stack_loc);
+      // cout << (*it)->opt << endl;
+      if (instr->opt != "<-" || !instr->mem_opt.empty() || instr->cmp_opt.empty()) {
+        replace_old_instruction(f, new_instructions, i, v, s_var, stack_loc);
+      }
+      replace_reads_from_v(f, new_instructions, i, v, s_var, stack_loc);
+
+      suffix++;
     }
-    replace_reads_from_v(f, new_instructions, i, v, stack_loc);
+    else {
+      new_instructions.push_back(instr);
+    }
   }
 
   // return new_instructions;
@@ -938,7 +1070,7 @@ bool is_callee_save_register(string r) {
 void caller_saving_register(L2::Function *f, Graph *g,
                        std::vector<std::vector<std::string>> & IN,
                        std::vector<std::vector<std::string>> & OUT) {
-
+  cout << "caller_saving_register" << endl;
   std::vector<L2::Instruction *> new_instructions;
 
   for (int i = 0; i < f->instructions.size(); i++) {
@@ -1027,7 +1159,7 @@ void save_callee_save_registers(L2::Function *f, std::set<std::string> registers
 
 void callee_save_register(L2::Program p, L2::Function *f, Graph *g) {
 
-  // cout << "callee_saving_var" << endl;
+  cout << "callee_saving_var" << endl;
 
   // if (!f->callee_registers_to_save.empty()) {
 
@@ -1164,8 +1296,10 @@ int main(
 
   L2::Program p = L2::L2_parse_file(argv[optind]);
 
-  for (auto f : p.functions) {
-
+  // for (auto f : p.functions) {
+  for (int q = 0; q < p.functions.size(); q++) {
+    // if (q == 0) continue;
+    auto f = p.functions[q];
     // for (auto v : f->vars) {
     //   cout << v << endl;
     // }
@@ -1178,7 +1312,11 @@ int main(
     std::vector<std::vector<std::string>> IN;
     std::vector<std::vector<std::string>> OUT;
 
+    int u = 0;
     do {
+      if (u++ >= 50) {
+        break;
+      }
       IN.clear();
       OUT.clear();
       // string str = ("(mem rsp 10) <-");
@@ -1186,7 +1324,7 @@ int main(
       // cout << str[1] << endl;
 
       // print_function(f);
-
+      // cout << "^^^" << endl;
       liveness(f, IN, OUT);
 
       // cout << "GENi:" << endl;
@@ -1199,6 +1337,7 @@ int main(
       //   cout << i << endl;
       // }
       // cout << endl;
+      // print_result(IN,OUT);
 
       // GEN.push_back(set<std::string>());
       // KILL.push_back(set<std::string>());
@@ -1216,21 +1355,28 @@ int main(
       // IN[2].push_back("v2");
       // IN[2].push_back("rax");
 
-
+      // cout << "^^^000" << endl;
       g = gen_inference_graph(f, IN, OUT);
       std::stack<string> spill_stack;
 
-      gen_coloring_graph(g, spill_stack);
-      coloring(f, g);
+      // cout << "^^^111" << endl;
 
+      gen_coloring_graph(g, spill_stack);
+      
+      // print_graph(g);
+      // cout << "^^^222" << endl;
       while (!spill_stack.empty()) {
+        // cout << "???????" << endl; 
         string v = spill_stack.top();
         spill(f, v);
+        // cout << "aaaaa" << endl;
         spill_stack.pop();
       }
+      // cout << "?????" << endl;
 
     } while (!all_colored(g));
 
+    coloring(f, g);
     // for (std::vector<L2::Instruction * >::iterator it = f->instructions.begin() ; it != f->instructions.end(); ++it) {
     //   delete (*it);
     // } 
@@ -1242,6 +1388,7 @@ int main(
     // print_function(f);
   }
 
+  // cout << "?????" << endl;
   print_program(p);
   // L1_compiler(p);
   

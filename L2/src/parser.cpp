@@ -392,15 +392,21 @@ namespace L2 {
     number {};
 
   struct call_name :
-    pegtl::string<'c','a','l','l'> {};
+    pegtl::string<'c','a','l','l',' '> {};
   
   struct instr_call :          // (call u N) | (call print 1) | (call allocate 2) | (call array-error 2)
     pegtl::seq<
       seps,
       call_name,
+      // pegtl::plus<
+      //   pegtl::one< ' ' >
+      // >,
       seps,
       call_function_name,
-      seps,
+      // seps,
+      pegtl::plus<
+        pegtl::one< ' ' >
+      >,
       call_function_paramter,
       seps
     > {};

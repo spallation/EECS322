@@ -51,6 +51,7 @@ namespace L2 {
     int64_t locals;
     std::vector<L2::Instruction *> instructions;
     std::set<std::string> vars;
+    // int64_t suffix;
     //std::set<string> callee_registers_to_save;
   };
 
