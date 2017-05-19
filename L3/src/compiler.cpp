@@ -69,7 +69,8 @@ bool isStrDigit(std::string s) {
 }
 
 bool isop(std::string s) {
-  return (s == "+" || s == "-" || s == "*" || s == "&" 
+  return (s == "+" || s == "-" || s == "*" || s == "&"
+    || s == "<" || s == "<=" || s == "="
     || s == "<<" || s == ">>" || s == "load" || s == "store");
 }
 
@@ -567,6 +568,7 @@ L3::Tree * generate_L2_tile_by_type(L3::L2_Tile_Type tt) {
     case L3::TILE_CALL_ASGN:
       return L2_gen_call_assign_tree();
     default:
+      // cout << tt << endl;
       cout << "Unknown tile type." << endl;
   }
 }
@@ -992,19 +994,21 @@ std::string write_L2_gen_aop_sop_cmp_asgn(L3::Tree * t, L3::Item_Type tt) {
   inst = "";
 
   if (tt == L3::CMP) {
+    // cout << "omgomgomgomgomgomg" << endl;
+    // t->printTree();
     inst += "(" + var + " <- " + t1 + " " + op + " " + t2 + ")\n";
   }
   else {
-    if (t1 == var) {
+  if (t1 == var) {
+    inst += "(" + var + " " + op + "= " + t2 + ")\n";
+  }
+  else if (t2 == var) {
+    inst += "(" + var + " " + op + "= " + t1 + ")\n";
+  }
+  else {
+      inst += "(" + var + " <- " + t1 + ")\n";
       inst += "(" + var + " " + op + "= " + t2 + ")\n";
-    }
-    else if (t2 == var) {
-      inst += "(" + var + " " + op + "= " + t1 + ")\n";
-    }
-    else {
-        inst += "(" + var + " <- " + t1 + ")\n";
-        inst += "(" + var + " " + op + "= " + t2 + ")\n";
-    }
+  }
   }
 
   return inst;
@@ -1012,7 +1016,8 @@ std::string write_L2_gen_aop_sop_cmp_asgn(L3::Tree * t, L3::Item_Type tt) {
 }
 
 std::string write_L2_gen_aop_sop_cmp(L3::Tree * t, L3::Item_Type tt) {
-  std::string op, t1, t2, val, inst;
+  std::string op, t1, t2, val;
+  std::string inst = "";
 
   op = t->root->item;
   t1 = t->root->children[0]->item;
@@ -1026,11 +1031,15 @@ std::string write_L2_gen_aop_sop_cmp(L3::Tree * t, L3::Item_Type tt) {
     t2 = t->root->children[1]->val;
   }
 
-  inst = "";
-  if (val != t1) {
-    inst += "(" + val + " <- " + t1 + ")\n";
+  if (op == "<" || op == "=" || op == "<=") {
+    inst += "(" + val + " <- " + t1 + " " + op + " " + t2 + ")\n";
   }
-  inst += "(" + val + " " + op + "= " + t2 + ")\n";
+  else {
+    if (val != t1) {
+      inst += "(" + val + " <- " + t1 + ")\n";
+    }
+    inst += "(" + val + " " + op + "= " + t2 + ")\n";
+  }
 
   return inst;
 }
@@ -1250,6 +1259,8 @@ std::string write_tiles(std::vector<L3::Tree *> matched_tiles) {
   std::string s = "";
 
   for (auto t : matched_tiles) {
+    // t->printTree();
+    // cout << t->tile_type << endl;
     switch (t->tile_type) {
       case L3::LEFT_MEM_PLUS :
       case L3::LEFT_MEM_MINUS :
@@ -1304,8 +1315,12 @@ std::string write_tiles(std::vector<L3::Tree *> matched_tiles) {
       case L3::AOP_SOP_CMP_AD :
         s +=  write_L2_gen_aop_sop_cmp(t,L3::AD);
         break;
-      // case L3::AOP_SOP_CMP_CMP :
-      //   s +=  write_L2_gen_aop_sop_cmp(t,L3::CMP);
+      case L3::AOP_SOP_CMP_CMP :
+        // cout << "aaaaaaaaaaaaaa" << endl;
+        // t->printTree();
+        // break;
+        s +=  write_L2_gen_aop_sop_cmp(t,L3::CMP);
+        break;
       case L3::AOP_SOP_CMP_SHIFT :
         s +=  write_L2_gen_aop_sop_cmp(t,L3::SHIFT);
         break;
