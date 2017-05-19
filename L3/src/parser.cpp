@@ -779,8 +779,8 @@ namespace L3 {
 
   template<> struct action < return_t > {
     static void apply( const pegtl::input & in, L3::Program & p){
-      cout << "return_t: ";
-      cout << in.string() << endl;
+      // cout << "return_t: ";
+      // cout << in.string() << endl;
 
       L3::Function *currentF = p.functions.back();
 

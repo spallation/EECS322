@@ -27,12 +27,10 @@ std::vector<std::string> H1_sorted_color = {"r10", "r11", "r8", "r9", "rax", "rc
 
 std::map<std::string, int> function_invokeNum;
 
-bool label_exist(std::vector<L3::Function *> functions, int i, std::string l) {
+bool label_exist(std::vector<L3::Function *> functions, std::string l) {
   for (int j = 0; j < functions.size(); j++) {
-    if (i != j) {
-      if (functions[i]->labels.find(l) != functions[i]->labels.end()) {
-        return true;
-      }
+    if (functions[j]->labels.find(l) != functions[j]->labels.end()) {
+      return true;
     }
   }
   return false;
@@ -40,19 +38,28 @@ bool label_exist(std::vector<L3::Function *> functions, int i, std::string l) {
 
 void add_suffix_to_label(L3::Program &p) {
   for (int i = 0; i < p.functions.size(); i++) {
-    for (auto l : p.functions[i]->labels) {
+    // cout << p.functions[i]->name << endl;
+    
+    std::vector<std::string> newLabels = std::vector<std::string> (p.functions[i]->labels.cbegin(), p.functions[i]->labels.cend());
+
+    for (auto l : newLabels) {
+      // cout << l << endl;
+      p.functions[i]->labels.erase(l);
+      // cout << "wtf1" << endl;
+      
       std::string new_label = l;
-      while (label_exist(p.functions, i, new_label)) {
+      while (label_exist(p.functions, new_label)) {
         new_label += std::to_string(p.label_suffix++);
       }
+      // cout << "wtf2" << endl;
       if (new_label != l) {
-        p.functions[i]->labels.erase(l);
-        p.functions[i]->labels.insert(new_label);
-
         for (auto instr : p.functions[i]->instructions) {
           instr->replace_label(l,new_label);
         }
       }
+      
+      p.functions[i]->labels.insert(new_label);
+      // cout << "wtf3" << endl;
     }
   }
 }
@@ -1383,6 +1390,17 @@ int main(
 
   L3::Program p = L3::L3_parse_file(argv[optind]);
   p.label_suffix = 0;
+
+  
+
+  // for (auto f : p.functions) {
+  //   for (auto l : f->labels) {
+  //     cout << l << endl;
+  //   }
+  //   for (auto i : f->instructions) {
+  //     print_instruction(i);
+  //   }
+  // }
 
   add_suffix_to_label(p);
 
