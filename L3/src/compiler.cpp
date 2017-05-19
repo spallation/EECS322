@@ -1391,17 +1391,6 @@ int main(
   L3::Program p = L3::L3_parse_file(argv[optind]);
   p.label_suffix = 0;
 
-  
-
-  // for (auto f : p.functions) {
-  //   for (auto l : f->labels) {
-  //     cout << l << endl;
-  //   }
-  //   for (auto i : f->instructions) {
-  //     print_instruction(i);
-  //   }
-  // }
-
   add_suffix_to_label(p);
 
   std::string program_str = "";
