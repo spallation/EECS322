@@ -1086,11 +1086,16 @@ void caller_saving_register(L2::Function *f, Graph *g,
         }
       }
       
-      int offset = 0;
+      int locals = f->caller_locals;
+      
+      int offset = f->caller_locals * 8;
       for (auto v : caller_save_vars) {
         write_caller_callee_save_regiester(v, offset, new_instructions);
         offset += 8;
-        f->locals++;
+        // f->locals++;
+        if (++locals > f->locals) {
+          f->locals = locals;
+        }
       }
     
       new_instructions.push_back(f->instructions[i]);
@@ -1098,7 +1103,7 @@ void caller_saving_register(L2::Function *f, Graph *g,
         new_instructions.push_back(f->instructions[++i]);
       }
 
-      offset = 0;
+      offset = f->caller_locals * 8;
       for (auto v : caller_save_vars) {
         read_caller_callee_save_regiester(v, offset, new_instructions);
         offset += 8;
@@ -1300,6 +1305,7 @@ int main(
   for (int q = 0; q < p.functions.size(); q++) {
     // if (q == 0) continue;
     auto f = p.functions[q];
+    f->caller_locals = f->locals;
     // for (auto v : f->vars) {
     //   cout << v << endl;
     // }

@@ -49,6 +49,7 @@ namespace L2 {
     std::string name;
     int64_t arguments;
     int64_t locals;
+    int64_t caller_locals;
     std::vector<L2::Instruction *> instructions;
     std::set<std::string> vars;
     // int64_t suffix;
