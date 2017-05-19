@@ -430,12 +430,12 @@ namespace LA {
       br2_instruction,
       br1_instruction,
       call_instruction,
-      call_assign_instruction,
       label_instruction,
       left_array_assign_instruction,
       right_array_assign_instruction,
       new_array_assign_instruction,
       new_tuple_assign_instruction,
+      call_assign_instruction,
       type_instruction,
       length_assign_instruction,
       op_assign_instruction,
@@ -672,7 +672,14 @@ namespace LA {
 
       LA::Function *currentF = p.functions.back();
       LA::Label_Instruction *newI = new LA::Label_Instruction();
-      newI->label = in.string();
+
+      newI->i_type = LA::LBL;
+
+      std::string o = in.string();
+      o.erase(remove(o.begin(), o.end(), '\n'), o.end());
+      o.erase(remove(o.begin(), o.end(), ' '), o.end());
+
+      newI->label = o;
       
       currentF->instructions.push_back(newI);
 
@@ -687,13 +694,17 @@ namespace LA {
 
       LA::Function *currentF = p.functions.back();
       
-      
-      LA::Type_Instruction *newI = new LA::Type_Instruction();
-      
-      newI->var = items.back();
+      std::string v = items.back();
       items.pop_back();
-      newI->type = items.back();
+      std::string tp = items.back();
       items.pop_back();
+
+      LA::Type_Instruction *newI = new LA::Type_Instruction(currentF,tp,v);
+      newI->i_type = LA::OTHER;
+      // newI->var = items.back();
+      // items.pop_back();
+      // newI->type = items.back();
+      // items.pop_back();
 
       currentF->instructions.push_back(newI);
 
@@ -711,6 +722,7 @@ namespace LA {
       
       
       LA::Simple_Assign_Instruction *newI = new LA::Simple_Assign_Instruction();
+      newI->i_type = LA::OTHER;
    
       newI->assign_right = items.back();
       items.pop_back();
@@ -733,6 +745,7 @@ namespace LA {
       
       
       LA::Op_Assign_Instruction *newI = new LA::Op_Assign_Instruction();
+      newI->i_type = LA::OTHER;
 
       newI->op_right = items.back();
       items.pop_back();
@@ -761,6 +774,7 @@ namespace LA {
       
       
       LA::Right_Array_Assign_Instruction *newI = new LA::Right_Array_Assign_Instruction();
+      newI->i_type = LA::OTHER;
 
       stack<std::string> ind_stack;
       while (!items.empty()) {
@@ -799,6 +813,7 @@ namespace LA {
       
       
       LA::Left_Array_Assign_Instruction *newI = new LA::Left_Array_Assign_Instruction();
+      newI->i_type = LA::OTHER;
       
       newI->assign_right = items.back();
       items.pop_back();
@@ -834,6 +849,7 @@ namespace LA {
       
       
       LA::Length_Assign_Instruction *newI = new LA::Length_Assign_Instruction();
+      newI->i_type = LA::OTHER;
       
       newI->t = items.back();
       items.pop_back();
@@ -859,7 +875,8 @@ namespace LA {
       
       
       LA::New_Array_Assign_Instruction *newI = new LA::New_Array_Assign_Instruction();
-      
+      newI->i_type = LA::OTHER;
+
       stack<std::string> arg_stack;
       while (!items.empty()) {
         if (items.back() == "<-") {
@@ -881,6 +898,8 @@ namespace LA {
 
       currentF->instructions.push_back(newI);
 
+      newI->set_array_size(currentF);
+
       items.clear();
     }
   };
@@ -892,14 +911,14 @@ namespace LA {
 
       LA::Function *currentF = p.functions.back();
       
-      
-      LA::New_Tuple_Assign_Instruction *newI = new LA::New_Tuple_Assign_Instruction();
-      
-      newI->t = items.back();
+      std::string tt = items.back();
       items.pop_back();
 
-      newI->assign_left = items.back();
+      std::string al = items.back();
       items.pop_back();
+
+      LA::New_Tuple_Assign_Instruction *newI = new LA::New_Tuple_Assign_Instruction(currentF,al,tt);
+      newI->i_type = LA::OTHER;
 
       currentF->instructions.push_back(newI);
 
@@ -916,7 +935,8 @@ namespace LA {
       
       
       LA::Call_Instruction *newI = new LA::Call_Instruction();
-      
+      newI->i_type = LA::OTHER;
+
       stack<std::string> arg_stack;
       while (!items.empty()) {
         arg_stack.push(items.back());
@@ -948,7 +968,8 @@ namespace LA {
       
       
       LA::Call_Assign_Instruction *newI = new LA::Call_Assign_Instruction();
-      
+      newI->i_type = LA::OTHER;
+
       stack<std::string> arg_stack;
       while (!items.empty()) {
         if (items.back() == "<-") {
@@ -987,7 +1008,8 @@ namespace LA {
       LA::Function *currentF = p.functions.back();
       
       LA::Br1_Instruction *newI = new LA::Br1_Instruction();
-      
+      newI->i_type = LA::TE;
+
       newI->label = items.back();
       items.pop_back();
 
@@ -1006,7 +1028,8 @@ namespace LA {
       
       
       LA::Br2_Instruction *newI = new LA::Br2_Instruction();
-      
+      newI->i_type = LA::TE;
+
       newI->label2 = items.back();
       items.pop_back();
 
@@ -1031,7 +1054,8 @@ namespace LA {
       
       
       LA::Return_Instruction *newI = new LA::Return_Instruction();
-      
+      newI->i_type = LA::TE;
+
       currentF->instructions.push_back(newI);
 
       items.clear();
@@ -1047,7 +1071,8 @@ namespace LA {
       
       
       LA::Var_Return_Instruction *newI = new LA::Var_Return_Instruction();
-      
+      newI->i_type = LA::TE;
+
       newI->var = items.back();
       items.pop_back();
 
