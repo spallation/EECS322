@@ -841,13 +841,14 @@ class Left_Array_Assign_Instruction : public Instruction {
 
         void decoding_instruction(LA::Function *f, std::string & v) {
             std::string tv = create_var_with_suffix(f);
-            v = tv;
 
             Type_Instruction * ti = new Type_Instruction(f,"int64",tv);
             en_decoded_instructions.push_back(ti);
 
             Op_Assign_Instruction * i = new Op_Assign_Instruction(
                 tv, ">>", v, "1");
+
+            v = tv;
             en_decoded_instructions.push_back(i);
         }
 
