@@ -343,15 +343,19 @@ class Length_Assign_Instruction : public Instruction {
             lv = remove_percent(assign_left);
             v = remove_percent(var);
 
-            v1 = create_var_with_suffix(b);
-            v2 = create_var_with_suffix(b);
-            
             inst = "";
-            inst += v1 + " <- " + t + " * 8\n"; 
-            inst += v1 + " <- " + v1 + " + " + "16\n";
-            inst += v2 + " <- " + v + " + " + v1 + "\n";
-            inst += lv + " <- load " + v2 + "\n";
-
+            if (b->var_type_map[v] == TUPLE) {
+                inst += lv + " <- load " + v + "\n";
+            }
+            else {
+                v1 = create_var_with_suffix(b);
+                v2 = create_var_with_suffix(b);
+                
+                inst += v1 + " <- " + t + " * 8\n"; 
+                inst += v1 + " <- " + v1 + " + " + "16\n";
+                inst += v2 + " <- " + v + " + " + v1 + "\n";
+                inst += lv + " <- load " + v2 + "\n"; 
+            }
             clear_temp_var_set(b);
             return inst;
         }
