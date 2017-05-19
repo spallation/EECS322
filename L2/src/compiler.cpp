@@ -59,6 +59,10 @@ void print_instruction(L2::Instruction *i) {
   for (auto optind : i->operands) {
     cout << optind << ", ";
   }
+  cout << "GEN: ";
+  for (auto j : i->GEN) {
+    cout << j << ", ";
+  }
   cout << endl;
 }
 
@@ -351,10 +355,11 @@ void liveness(L2::Function *f,
 
   int j = 0; // instruction index
   for (auto i : f->instructions) {
-    i->GEN.clear();
-    i->KILL.clear();
+    // i->GEN.clear();
+    // i->KILL.clear();
     get_GEN_KILL(i);
   }
+  // print_function(f);
   // cout << "wtf1" << endl;
   // print_GEN_KILL(GEN,KILL);
 
@@ -837,6 +842,8 @@ void replace_old_instruction(L2::Function *f,
   newI->operands = curI->operands;
   // newI->instr_string = curI->instr_string;
 
+  get_GEN_KILL(newI);
+
   new_instructions.push_back(newI);
   print_instruction(newI);
   // cout << endl;
@@ -880,6 +887,8 @@ void replace_writes_to_v(L2::Function *f,
     newI->operands.push_back(to_string(stack_loc));
     // newI->instr_string = s_var + " <- (mem rsp " + to_string(stack_loc) + ")";
 
+    get_GEN_KILL(newI);
+
     new_instructions.push_back(newI);
     print_instruction(newI);
     // cout << newI->opt << endl;
@@ -918,13 +927,14 @@ void replace_reads_from_v(L2::Function *f,
     cout << "check replace_reads_from_v" << endl;
   }
   
-  if (f->instructions[i]->opt == "<-") {
-    newI->operands.push_back(f->instructions[i]->operands.back());
-  }
-  else {
-    newI->operands.push_back(s_var);
-  }
-  
+  // if (f->instructions[i]->opt == "<-") {
+  //   newI->operands.push_back(f->instructions[i]->operands.back());
+  // }
+  // else {
+  newI->operands.push_back(s_var);
+  // }
+
+  get_GEN_KILL(newI);
 
   // for (auto opd : newI->operands) {
   //   cout << opd << " ";
@@ -943,6 +953,12 @@ void replace_reads_from_v(L2::Function *f,
 }
 
 bool instruction_need_spill(L2::Instruction * i, string v) {
+  // for (auto opd : i->operands) {
+  //   if (opd == v) {
+  //     return true;
+  //   }
+  // }
+  // return false;
   int num_of_writes_to_v = count_var_in_set(v,i->GEN);
   if (num_of_writes_to_v == 0 && i->KILL.find(v) == i->KILL.end()) {
     return false;
@@ -950,13 +966,16 @@ bool instruction_need_spill(L2::Instruction * i, string v) {
   return true;
 }
 
-void spill(L2::Function *f, string v) {
+void spill(L2::Function *f, string v, int & temp_var_suffix) {
   cout << "spill " << v << endl;
 
   // print_function(f);
+  if (v == "tv4") {
+    print_function(f);
+  }
 
   int stack_loc = (f->locals++) * 8;
-  int suffix = 0;
+  // int suffix = 0;
   std::vector<L2::Instruction *> new_instructions;
   // for (vector<L2::Instruction*>::iterator it = f->instructions.begin(); it < f->instructions.end(); it++) {
   for (int i = 0; i < f->instructions.size(); i++) {
@@ -971,9 +990,9 @@ void spill(L2::Function *f, string v) {
       print_instruction(instr);
       
       int gen_var_suffix = 1;
-      string s_var = convert_to_suffix(gen_var_suffix) + to_string(suffix);
+      string s_var = convert_to_suffix(gen_var_suffix) + to_string(temp_var_suffix);
       while (var_exists_in_function(s_var,f)) {
-        s_var = convert_to_suffix(++gen_var_suffix) + to_string(suffix);
+        s_var = convert_to_suffix(++gen_var_suffix) + to_string(temp_var_suffix);
       }
       cout << s_var << endl;
 
@@ -984,7 +1003,7 @@ void spill(L2::Function *f, string v) {
       // }
       replace_reads_from_v(f, new_instructions, i, v, s_var, stack_loc);
 
-      suffix++;
+      temp_var_suffix++;
     }
     else {
       new_instructions.push_back(instr);
@@ -1305,7 +1324,13 @@ int main(
   for (int q = 0; q < p.functions.size(); q++) {
     // if (q == 0) continue;
     auto f = p.functions[q];
-    f->caller_locals = f->locals;
+
+    int temp_var_suffix = 0;
+
+    // for (auto i : f->instructions) {
+    //   get_GEN_KILL(i);
+    // }
+    // print_function(f);
     // for (auto v : f->vars) {
     //   cout << v << endl;
     // }
@@ -1369,12 +1394,13 @@ int main(
 
       gen_coloring_graph(g, spill_stack);
       
+      // print_function(f);
       // print_graph(g);
       // cout << "^^^222" << endl;
       while (!spill_stack.empty()) {
         // cout << "???????" << endl; 
         string v = spill_stack.top();
-        spill(f, v);
+        spill(f, v, temp_var_suffix);
         // cout << "aaaaa" << endl;
         spill_stack.pop();
       }
@@ -1389,6 +1415,8 @@ int main(
     // f->instructions.clear();
 
     // print_function(f);
+    f->caller_locals = f->locals;
+
     caller_saving_register(f, g, IN, OUT);
     callee_save_register(p, f, g);
     // print_function(f);
