@@ -389,17 +389,22 @@ class Call_Assign_Instruction : public Instruction {
         }
 
         std::string translate_to_L3(IR::BB *b) {
+
+            for (int i = 0; i < args.size(); i++) {
+                args[i] = remove_percent(args[i]);
+            }
+
             std::ostringstream oss;
 
             if (!args.empty()) {
                 // Convert all but the last element to avoid a trailing ","
                 std::copy(args.begin(), args.end()-1, std::ostream_iterator<std::string>(oss, ","));
                 // Now add the last element with no delimiter
-                oss << remove_percent(args.back());
+                oss << args.back();
             }
 
             std::string s("");
-            s += remove_percent(assign_left) + " <- call " + remove_percent(callee) + " (" + remove_percent(oss.str()) + ")\n";
+            s += remove_percent(assign_left) + " <- call " + remove_percent(callee) + " (" + oss.str() + ")\n";
             return s;
         }
 
@@ -510,15 +515,19 @@ class Call_Instruction : public Instruction {
         std::string translate_to_L3(IR::BB *b) {
             std::ostringstream oss;
 
+            for (int i = 0; i < args.size(); i++) {
+                args[i] = remove_percent(args[i]);
+            }
+
             if (!args.empty()) {
                 // Convert all but the last element to avoid a trailing ","
                 std::copy(args.begin(), args.end()-1, std::ostream_iterator<std::string>(oss, ","));
                 // Now add the last element with no delimiter
-                oss << remove_percent(args.back());
+                oss << args.back();
             }
 
             std::string s("");
-            s = s + "call " + remove_percent(callee) + " (" + remove_percent(oss.str()) + ")\n";
+            s = s + "call " + remove_percent(callee) + " (" + oss.str() + ")\n";
             return s;
         }
 };
