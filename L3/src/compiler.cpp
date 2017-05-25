@@ -27,6 +27,17 @@ std::vector<std::string> H1_sorted_color = {"r10", "r11", "r8", "r9", "rax", "rc
 
 std::map<std::string, int> function_invokeNum;
 
+std::map<std::string, std::string> reference_map;
+
+std::set<std::string> not_losing_reference;
+
+std::string get_reference(std::string v) {
+  if (reference_map.find(v) != reference_map.end() && not_losing_reference.find(v) == not_losing_reference.end()) {
+    return reference_map[v];
+  }
+  return v;
+}
+
 bool label_exist(std::vector<L3::Function *> functions, std::string l) {
   for (int j = 0; j < functions.size(); j++) {
     if (functions[j]->labels.find(l) != functions[j]->labels.end()) {
@@ -79,6 +90,17 @@ bool isop(std::string s) {
   return (s == "+" || s == "-" || s == "*" || s == "&"
     || s == "<" || s == "<=" || s == "="
     || s == "<<" || s == ">>" || s == "load" || s == "store");
+}
+
+bool is_t(std::string s) {
+  if (s == "+" || s == "-" || s == "*" || s == "&"
+    || s == "<" || s == "<=" || s == "="
+    || s == "<<" || s == ">>" || s == "load" || s == "store"
+    || s == "call" || s == "return" || s == "<-"
+    || s == "br" || s == "label") {
+    return false;
+  }
+  return true;
 }
 
 void swapItem(std::string &s1, std::string &s2) {
@@ -144,6 +166,10 @@ bool replace_node(L3::Node * node, L3::Node * var, L3::Node * alter_var) {
         // alter_var->printNode();
         // cout << endl;
         success = true;
+
+        if (is_t(alter_var->item)) {
+          reference_map[var->item] = alter_var->item;
+        }
       }
       else if(replace_node(node->children[i], var, alter_var)) {
         success = true;
@@ -814,6 +840,10 @@ std::string write_L2_gen_left_mem_plus_minus_tree(L3::Tree * t, L3::L2_Tile_Type
     t1 = t->root->children[1]->children[0]->item;
   }
 
+  x = get_reference(x);
+  // M = get_reference(M);
+  t1 = get_reference(t1);
+
   inst = "";
   if (tt == L3::LEFT_MEM_PLUS) {
     inst += "((mem " + x + " " + M + ") += " + t1 + ")\n";
@@ -844,6 +874,13 @@ std::string write_L2_gen_right_mem_plus_minus_tree(L3::Tree * t, L3::L2_Tile_Typ
     swapItem(x,M);
   }
 
+  // x = get_reference(x);
+  // M = get_reference(M);
+  w = get_reference(w);
+  // not_losing_reference.insert(w);
+
+  x = get_reference(x);
+
   inst = "";
   if (tt == L3::LEFT_MEM_PLUS) {
     inst += "(" + w + " += (mem " + x + " " + M + "))\n";
@@ -873,6 +910,14 @@ std::string write_L2_gen_left_mem_assign_tree(L3::Tree * t) {
     swapItem(x,M);
   }
 
+  x = get_reference(x);
+  // M = get_reference(M);
+  var = get_reference(var);
+
+  if (var == "dim") {
+    cout << "wtfwtfwtfwtfwtfwtfwtfwtf" << endl;
+  }
+
   inst = "";
   inst += "((mem " + x + " " + M + ") <- " + var + ")\n";
 
@@ -898,6 +943,11 @@ std::string write_L2_gen_right_mem_assign_tree(L3::Tree * t) {
   if (isStrDigit(x)) {
     swapItem(x,M);
   }
+
+  not_losing_reference.insert(var);
+  not_losing_reference.insert(op_var);
+  x = get_reference(x);
+  // M = get_reference(M);
 
   inst = "";
   if (!isStrDigit(M)) {
@@ -933,6 +983,10 @@ std::string write_L2_gen_lea_tree(L3::Tree * t) {
     swapItem(v3,e);
   }
 
+  not_losing_reference.insert(v1);
+  v2 = get_reference(v2);
+  v3 = get_reference(v3);
+
   inst = "";
   inst += "(" + v1 + " @ " + v2 + " " + v3 + " " + e + ")\n";
 
@@ -958,6 +1012,9 @@ std::string write_L2_gen_inc_tree(L3::Tree * t) {
   
   inst += "(" + w + "++)\n";
 
+  not_losing_reference.insert(w);
+  // not_losing_reference.insert(tmp);
+
   return inst;
 }
 
@@ -980,6 +1037,9 @@ std::string write_L2_gen_dec_tree(L3::Tree * t) {
   
   inst += "(" + w + "--)\n";
 
+  not_losing_reference.insert(w);
+  // not_losing_reference.insert(tmp);
+
   return inst;
 }
 
@@ -998,24 +1058,40 @@ std::string write_L2_gen_aop_sop_cmp_asgn(L3::Tree * t, L3::Item_Type tt) {
     t2 = t->root->children[1]->children[1]->val;
   }
 
+  // var = get_reference(var);
+  
+
   inst = "";
 
   if (tt == L3::CMP) {
     // cout << "omgomgomgomgomgomg" << endl;
     // t->printTree();
+    not_losing_reference.insert(var);
+    t1 = get_reference(t1);
+    t2 = get_reference(t2);
     inst += "(" + var + " <- " + t1 + " " + op + " " + t2 + ")\n";
   }
   else {
-  if (t1 == var) {
-    inst += "(" + var + " " + op + "= " + t2 + ")\n";
-  }
-  else if (t2 == var) {
-    inst += "(" + var + " " + op + "= " + t1 + ")\n";
-  }
-  else {
-      inst += "(" + var + " <- " + t1 + ")\n";
+    if (t1 == var) {
+      // not_losing_reference.insert(var);
+      var = get_reference(var);
+      t2 = get_reference(t2);
+      not_losing_reference.insert(var);
       inst += "(" + var + " " + op + "= " + t2 + ")\n";
-  }
+    }
+    else if (t2 == var) {
+      var = get_reference(var);
+      t1 = get_reference(t1);
+      not_losing_reference.insert(var);
+      inst += "(" + var + " " + op + "= " + t1 + ")\n";
+    }
+    else {
+        t1 = get_reference(t1);
+        t2 = get_reference(t2);
+        not_losing_reference.insert(var);
+        inst += "(" + var + " <- " + t1 + ")\n";
+        inst += "(" + var + " " + op + "= " + t2 + ")\n";
+    }
   }
 
   return inst;
@@ -1038,13 +1114,22 @@ std::string write_L2_gen_aop_sop_cmp(L3::Tree * t, L3::Item_Type tt) {
     t2 = t->root->children[1]->val;
   }
 
+ 
+  // val = get_reference(val);
+
   if (op == "<" || op == "=" || op == "<=") {
+    not_losing_reference.insert(val);
+    t1 = get_reference(t1);
+    t2 = get_reference(t2);
     inst += "(" + val + " <- " + t1 + " " + op + " " + t2 + ")\n";
   }
   else {
     if (val != t1) {
+      t1 = get_reference(t1);
+      not_losing_reference.insert(val);
       inst += "(" + val + " <- " + t1 + ")\n";
     }
+    t2 = get_reference(t2);
     inst += "(" + val + " " + op + "= " + t2 + ")\n";
   }
 
@@ -1061,9 +1146,13 @@ std::string write_L2_gen_simple_assign_tree(L3::Tree * t) {
   if (isop(right)) {
     right = t->root->children[1]->val;
   }
+
   if (left != right) {
+    not_losing_reference.insert(left);
+    right = get_reference(right);
     inst += "(" + left + " <- " + right + ")\n";
   }
+
   return inst;
 }
 
@@ -1072,6 +1161,8 @@ std::string write_L2_gen_cjump_tree(L3::Tree * t) {
   var = t->root->children[0]->item;
   l1 = t->root->children[1]->item;
   l2 = t->root->children[2]->item;
+
+  var = get_reference(var);
 
   inst = "";
   inst += "(cjump " + var + " = 1 " + l1 + " " + l2 + ")\n";
@@ -1097,6 +1188,7 @@ std::string write_L2_gen_return_tree(L3::Tree * t) {
 std::string write_L2_gen_return_var_tree(L3::Tree * t) {
   std::string l, inst;
   l = t->root->children[0]->item;
+  l = get_reference(l);
   inst = "";
   inst += "(rax <- " + l + ")\n";
   inst += "(return)\n";
@@ -1121,6 +1213,7 @@ std::string write_L2_gen_call_tree(L3::Tree * t) {
 
 
   for (int i = 0; i < args_vec.size() && i < 6; i++) {
+    args_vec[i] = get_reference(args_vec[i]);
     inst += "(" + args[i] + " <- " + args_vec[i] + ")\n";
   }
   
@@ -1170,6 +1263,9 @@ std::string write_L2_gen_call_assign_tree(L3::Tree * t) {
 
   inst = "";
   inst += "(" + var + " <- " + "rax)\n";
+
+  not_losing_reference.insert(var);
+
   return inst;
 }
 
@@ -1398,6 +1494,8 @@ int main(
 
   for (auto f : p.functions) {
 
+    reference_map.clear();
+
     program_str += "(" + f->name + " " + std::to_string(f->args.size()) + " 0\n";
     for (int i = 0; i < f->args.size() && i < 6; i++) {
       program_str += "(" + f->args[i] + " <- " + args[i] + ")\n";
@@ -1436,6 +1534,17 @@ int main(
 
     program_str += write_tiles(matched_tiles);
     program_str += ")\n";
+
+    cout << "reference_map: " << endl;
+    for (auto pr : reference_map) {
+      cout << pr.first << " " << pr.second << endl;
+    }
+
+    cout << "not_losing_reference: " << endl;
+    for (auto x : not_losing_reference) {
+      cout << x << " ";
+    }
+    cout << endl;
 
   }
   program_str += ")\n";
