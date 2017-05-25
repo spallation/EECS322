@@ -425,6 +425,7 @@ namespace LA {
 
   struct LA_instruction_rule:
     pegtl::sor<
+      type_instruction,
       var_return_instruction,
       return_instruction,
       br2_instruction,
@@ -436,7 +437,6 @@ namespace LA {
       new_array_assign_instruction,
       new_tuple_assign_instruction,
       call_assign_instruction,
-      type_instruction,
       length_assign_instruction,
       op_assign_instruction,
       simple_assign_instruction

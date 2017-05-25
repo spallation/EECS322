@@ -32,6 +32,7 @@ class Function{
         std::map<std::string, std::string> tuple_length_map;
 
         int64_t var_suffix;
+        int64_t label_suffix;
 
         std::string remove_percent(std::string s) {
         if (!s.empty() && s.at(0) == '%') {
@@ -76,7 +77,7 @@ class Program{
     public:
         std::string entryPointLabel;
         std::vector<LA::Function *> functions;
-        int64_t label_suffix;
+        // int64_t label_suffix;
 };
 
 class Instruction {

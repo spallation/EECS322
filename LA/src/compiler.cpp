@@ -59,12 +59,12 @@ std::string remove_percent(std::string s) {
 }
 
 std::string create_label_with_suffix(LA::Function *f) {
-    std::string v = ":tv" + std::to_string(f->var_suffix++);
-    while (f->var_set.find(v) != f->var_set.end() || f->temp_var_set.find(v) != f->temp_var_set.end()) {
-        v = ":tv" + std::to_string(f->var_suffix++);
+    std::string l = ":tlb" + std::to_string(f->label_suffix++);
+    while (f->labels.find(l) != f->labels.end()) {
+        l = ":tlb" + std::to_string(f->label_suffix++);
     }
-    f->temp_var_set.insert(v);
-    return v;
+    f->labels.insert(l);
+    return l;
 }
 
 std::vector<LA::Instruction *> generate_bb(LA::Function *f) {
